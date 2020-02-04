@@ -144,9 +144,9 @@ class ElasticInterface(object):
     def make_mapping(self, idx, template="cms"):
         idx_clt = elasticsearch.client.IndicesClient(self.handle)
         mappings = make_mappings()
-        # print idx_clt.put_mapping(doc_type="job", index=idx, body=json.dumps({"properties": mappings}), ignore=400)
+        # print(idx_clt.put_mapping(doc_type="job", index=idx, body=json.dumps({"properties": mappings}), ignore=400))
         settings = make_settings()
-        # print idx_clt.put_settings(index=idx, body=json.dumps(settings), ignore=400)
+        # print(idx_clt.put_settings(index=idx, body=json.dumps(settings), ignore=400))
 
         body = json.dumps({"mappings": mappings, "settings": {"index": settings}})
 
