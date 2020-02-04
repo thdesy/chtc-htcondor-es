@@ -184,7 +184,7 @@ def main():
     )
     parser.add_argument(
         "--es_port",
-        default=9203,
+        default=9200,
         type=int,
         dest="es_port",
         help="Port of the elasticsearch instance to be used " "[default: %(default)d]",
