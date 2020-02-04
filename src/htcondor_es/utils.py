@@ -47,10 +47,7 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
     for host in collectors:
         coll = htcondor.Collector(host)
         try:
-            schedds = coll.query(
-                htcondor.AdTypes.Schedd,
-                projection=["MyAddress", "ScheddIpAddr", "Name"],
-            )
+            schedds = coll.locateAll(htcondor.DaemonTypes.Schedd)
         except IOError as e:
             logging.warning(str(e))
             continue
