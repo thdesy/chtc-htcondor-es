@@ -136,9 +136,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
     _completed_since = starttime - (TIMEOUT_MINS + 1) * 60
     query = ("""
          (JobStatus < 3 || JobStatus > 4 
-         || EnteredCurrentStatus >= %(completed_since)d
-         || CRAB_PostJobLastUpdate >= %(completed_since)d
-         ) && (CMS_Type != "DONOTMONIT")
+         || EnteredCurrentStatus >= %(completed_since)d)
          """
         % {"completed_since": _completed_since}
     )

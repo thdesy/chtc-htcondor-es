@@ -228,10 +228,6 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
         # If there was no previous completion, get last 12 h
         last_completion = checkpoint.get(name, time.time() - 12 * 3600)
 
-        # For CRAB, only ever get a maximum of 12 h
-        if name.startswith("crab") and last_completion < time.time() - 12 * 3600:
-            last_completion = time.time() - 12 * 3600
-
         future = pool.apply_async(
             process_schedd,
             (starttime, last_completion, checkpoint_queue, schedd_ad, args, metadata),
