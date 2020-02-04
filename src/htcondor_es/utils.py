@@ -57,7 +57,6 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
 
         for schedd in schedds:
             try:
-                schedd["CMS_Pool"] = pool_name
                 schedd_ads[schedd["Name"]] = schedd
             except KeyError:
                 pass

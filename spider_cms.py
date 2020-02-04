@@ -191,12 +191,11 @@ def main():
     )
     parser.add_argument(
         "--es_index_template",
-        default="cms",
+        default="htcondor",
         type=str,
         dest="es_index_template",
         help=(
             "Trunk of index pattern. "
-            "Needs to start with 'cms' "
             "[default: %(default)s]"
         ),
     )

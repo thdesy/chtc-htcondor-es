@@ -46,7 +46,6 @@ def make_mappings():
     props["metadata"] = {
         "properties": {"spider_runtime": {"type": "date", "format": "epoch_millis"}}
     }
-    props["ChirpCMSSW_SiteIO"] = {"type": "nested"}
 
     dynamic_string_template = {
         "strings_as_keywords": {
@@ -120,7 +119,7 @@ class ElasticInterface(object):
         else:
             self.handle = elasticsearch.Elasticsearch()
 
-    def fix_mapping(self, idx, template="cms"):
+    def fix_mapping(self, idx, template="htcondor"):
         idx_clt = elasticsearch.client.IndicesClient(self.handle)
         mappings = make_mappings()
         custom_mappings = {
@@ -141,7 +140,7 @@ class ElasticInterface(object):
             )
         )
 
-    def make_mapping(self, idx, template="cms"):
+    def make_mapping(self, idx, template="htcondor"):
         idx_clt = elasticsearch.client.IndicesClient(self.handle)
         mappings = make_mappings()
         # print(idx_clt.put_mapping(doc_type="job", index=idx, body=json.dumps({"properties": mappings}), ignore=400))
@@ -167,7 +166,7 @@ class ElasticInterface(object):
 _index_cache = set()
 
 
-def get_index(timestamp, template="cms", update_es=True):
+def get_index(timestamp, template="htcondor", update_es=True):
     global _index_cache
     idx = time.strftime(
         "%s-%%Y-%%m-%%d" % template,
