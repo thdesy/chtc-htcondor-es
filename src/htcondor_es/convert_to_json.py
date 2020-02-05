@@ -11,10 +11,6 @@ import datetime
 import zlib
 import base64
 import htcondor
-from htcondor_es.AffiliationManager import (
-    AffiliationManager,
-    AffiliationManagerException,
-)
 
 string_vals = set(
     [
@@ -573,22 +569,6 @@ postjob_status_decode = {
 
 _launch_time = int(time.time())
 
-# Initialize aff_mgr
-aff_mgr = None
-try:
-    aff_mgr = AffiliationManager(
-        recreate=False,
-        dir_file=os.getenv(
-            "AFFILIATION_DIR_LOCATION",
-            AffiliationManager._AffiliationManager__DEFAULT_DIR_PATH,
-        ),
-    )
-except AffiliationManagerException as e:
-    # If its not possible to create the affiliation manager
-    # Log it
-    logging.error("There were an error creating the affiliation manager, %s", e)
-    # Continue execution without affiliation.
-
 
 def make_list_from_string_field(ad, key, split_re=r"[\s,]+\s*", default=None):
     default = default or ["UNKNOWN"]
@@ -596,22 +576,6 @@ def make_list_from_string_field(ad, key, split_re=r"[\s,]+\s*", default=None):
         return re.split(split_re, ad[key])
     except (TypeError, KeyError):
         return default
-
-
-def get_creation_time_from_taskname(ad):
-    """
-    returns the task creation date as a timestamp given the task name.
-    CRAB task names includes the creation time in format %y%m%d_%H%M%S:
-    190309_085131:adeiorio_crab_80xV2_ST_t-channel_top_4f_scaleup_inclusiveDecays_13TeV-powhegV2-madspin-pythia8
-    """
-    try:
-        _str_date = ad["CRAB_Workflow"].split(":")[0]
-        _naive_date = datetime.datetime.strptime(_str_date, "%y%m%d_%H%M%S")
-        return int(calendar.timegm(_naive_date.timetuple()))
-    except (KeyError, TypeError, ValueError):
-        # fallback to recordtime if there is not a CRAB_Workflow value
-        # or if it hasn't the expected format.
-        return recordTime(ad)
 
 
 _cream_re = re.compile(r"CPUNumber = (\d+)")
@@ -630,7 +594,7 @@ _cmssw_version = re.compile(r"CMSSW_((\d*)_(\d*)_.*)")
 
 
 def convert_to_json(
-    ad, cms=True, return_dict=False, reduce_data=False, pool_name="Unknown"
+    ad, return_dict=False, reduce_data=False
 ):
     if ad.get("TaskType") == "ROOT":
         return None
@@ -640,62 +604,20 @@ def convert_to_json(
     result["DataCollectionDate"] = result["RecordTime"]
 
     result["ScheddName"] = ad.get("GlobalJobId", "UNKNOWN").split("#")[0]
-    result["CMS_Pool"] = pool_name
-    # Determine type
-    if cms:
-        result["Type"] = ad.get("CMS_Type", "unknown").lower()
-    analysis = (
-        result.get("Type") == "analysis" or result.get("CMS_JobType") == "Analysis"
-    )
-    if "CRAB_Id" in ad:
-        result["FormattedCrabId"] = get_formatted_CRAB_Id(ad.get("CRAB_Id"))
-
-    if cms:
-        ad.setdefault(
-            "MATCH_EXP_JOB_GLIDEIN_CMSSite",
-            ad.get("MATCH_EXP_JOBGLIDEIN_CMSSite", "Unknown"),
-        )
 
     bulk_convert_ad_data(ad, result)
 
     # Classify failed jobs
     result["JobFailed"] = jobFailed(ad)
-    result["ErrorType"] = errorType(ad)
-    result["ErrorClass"] = errorClass(result)
     result["ExitCode"] = commonExitCode(ad)
     if "ExitCode" in ad:
         result["CondorExitCode"] = ad["ExitCode"]
 
-    if cms:
-        result["CMS_JobType"] = str(
-            ad.get("CMS_JobType", "Analysis" if analysis else "Unknown")
-        )
-        result["CRAB_AsyncDest"] = str(ad.get("CRAB_AsyncDest", "Unknown"))
-        result["WMAgent_TaskType"] = ad.get("WMAgent_SubTaskName", "/UNKNOWN").rsplit(
-            "/", 1
-        )[-1]
-        result["Campaign"] = guessCampaign(ad, analysis)
-        result["TaskType"] = (
-            result.get("CMS_TaskType",
-            guessTaskType(ad) if not analysis else result["CMS_JobType"])
-        )
-        result["Workflow"] = guessWorkflow(ad, analysis)
     now = time.time()
     if ad.get("JobStatus") == 2 and (ad.get("EnteredCurrentStatus", now + 1) < now):
         ad["RemoteWallClockTime"] = int(now - ad["EnteredCurrentStatus"])
         ad["CommittedTime"] = ad["RemoteWallClockTime"]
     result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600.0
-
-    result["PilotRestLifeTimeMins"] = -1
-    if analysis and ad.get("JobStatus") == 2 and "LastMatchTime" in ad:
-        try:
-            result["PilotRestLifeTimeMins"] = int(
-                (ad["MATCH_GLIDEIN_ToDie"] - ad["EnteredCurrentStatus"]) / 60
-            )
-        except (KeyError, ValueError, TypeError):
-            result["PilotRestLifeTimeMins"] = -72 * 60
-
-    result["HasBeenTimingTuned"] = ad.get("HasBeenTimingTuned", False)
 
     if "RequestCpus" not in ad:
         m = _cream_re.search(ad.get("CreamAttributes", ""))
@@ -731,41 +653,11 @@ def convert_to_json(
     ) / 3600.0
     result["DiskUsageGB"] = ad.get("DiskUsage_RAW", 0) / 1000000.0
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024.0
-    result["DataLocations"] = make_list_from_string_field(
-        ad, "DESIRED_CMSDataLocations"
-    )
-    result["DESIRED_Sites"] = make_list_from_string_field(ad, "DESIRED_Sites")
-    result["Original_DESIRED_Sites"] = make_list_from_string_field(
-        ad, "ExtDESIRED_Sites"
-    )
-    result["DesiredSiteCount"] = len(result["DESIRED_Sites"])
-    result["DataLocationsCount"] = len(result["DataLocations"])
-    result["CRAB_TaskCreationDate"] = get_creation_time_from_taskname(ad)
 
-    result["CMSPrimaryPrimaryDataset"] = "Unknown"
-    result["CMSPrimaryProcessedDataset"] = "Unknown"
-    result["CMSPrimaryDataTier"] = "Unknown"
-    if "DESIRED_CMSDataset" in result:
-        info = str(result["DESIRED_CMSDataset"]).split("/")
-        if len(info) > 3:
-            result["CMSPrimaryPrimaryDataset"] = info[1]
-            result["CMSPrimaryProcessedDataset"] = info[2]
-            result["CMSPrimaryDataTier"] = info[-1]
-
-    if cms and analysis:
-        result["OutputFiles"] = (
-            len(ad.get("CRAB_AdditionalOutputFiles", []))
-            + len(ad.get("CRAB_TFileOutputFiles", []))
-            + len(ad.get("CRAB_EDMOutputFiles", []))
-            + ad.get("CRAB_SaveLogsFlag", 0)
-        )
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
     if "x509UserProxyVOName" in ad:
         result["VO"] = str(ad["x509UserProxyVOName"])
-    if cms:
-        result["CMSGroups"] = make_list_from_string_field(ad, "CMSGroups")
-        result["Site"] = ad.get("MATCH_EXP_JOB_GLIDEIN_CMSSite", "UNKNOWN")
     elif ("GlideinEntryName" in ad) and ("MATCH_EXP_JOBGLIDEIN_ResourceName" not in ad):
         m = _generic_site.match(ad["GlideinEntryName"])
         m2 = _cms_site.match(ad["GlideinEntryName"])
@@ -784,31 +676,7 @@ def convert_to_json(
             result["Site"] = "UNKNOWN"
     else:
         result["Site"] = ad.get("MATCH_EXP_JOBGLIDEIN_ResourceName", "UNKNOWN")
-    if cms:
-        info = result["Site"].split("_", 2)
-        if len(info) == 3:
-            result["Tier"] = info[0]
-            result["Country"] = info[1]
-        else:
-            result["Tier"] = "Unknown"
-            result["Country"] = "Unknown"
-        if "Site" not in result or "DESIRED_Sites" not in result:
-            result["InputData"] = "Unknown"
-        elif ("DESIRED_CMSDataLocations" not in result) or (
-            result["DESIRED_CMSDataLocations"] is None
-        ):  # CRAB2 case.
-            result["InputData"] = "Onsite"
-        elif result["Site"] in result["DESIRED_CMSDataLocations"]:
-            result["InputData"] = "Onsite"
-        elif (result["Site"] != "UNKNOWN") and (ad.get("JobStatus") != 1):
-            result["InputData"] = "Offsite"
-            if analysis:
-                if result["Site"] not in result["DESIRED_Sites"]:
-                    result["OverflowType"] = "FrontendOverflow"
-                else:
-                    result["OverflowType"] = "IgnoreLocality"
-            else:
-                result["OverflowType"] = "Unified"
+
     if result["WallClockHr"] == 0:
         result["CpuEff"] = 0
     else:
@@ -825,20 +693,6 @@ def convert_to_json(
     ) / 3600.0
     result["Badput"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0.0)
     result["CpuBadput"] = max(result["CoreHr"] - result["CpuTimeHr"], 0.0)
-
-    handle_chirp_info(ad, result)
-
-    # Parse CRAB3 information on CMSSW version
-    result["CMSSWVersion"] = "Unknown"
-    result["CMSSWMajorVersion"] = "Unknown"
-    result["CMSSWReleaseSeries"] = "Unknown"
-    if "CRAB_JobSW" in result:
-        match = _cmssw_version.match(result["CRAB_JobSW"])
-        if match:
-            result["CMSSWVersion"] = match.group(1)
-            subv, ssubv = int(match.group(2)), int(match.group(3))
-            result["CMSSWMajorVersion"] = "%d_X_X" % (subv)
-            result["CMSSWReleaseSeries"] = "%d_%d_X" % (subv, ssubv)
 
     # Parse new machine statistics.
     try:
@@ -892,55 +746,11 @@ def convert_to_json(
     result["HasSingularity"] = classad.ExprTree(
         "MachineAttrHAS_SINGULARITY0 is true"
     ).eval(ad)
-    if "ChirpCMSSWCPUModels" in ad and not isinstance(
-        ad["ChirpCMSSWCPUModels"], classad.ExprTree
-    ):
-        result["CPUModel"] = str(ad["ChirpCMSSWCPUModels"])
-        result["CPUModelName"] = str(ad["ChirpCMSSWCPUModels"])
-        result["Processor"] = str(ad["ChirpCMSSWCPUModels"])
-    elif "MachineAttrCPUModel0" in ad:
+    
+    if "MachineAttrCPUModel0" in ad:
         result["CPUModel"] = str(ad["MachineAttrCPUModel0"])
         result["CPUModelName"] = str(ad["MachineAttrCPUModel0"])
         result["Processor"] = str(ad["MachineAttrCPUModel0"])
-
-    # Affiliation data:
-    if aff_mgr:
-        _aff = None
-        if "CRAB_UserHN" in result:
-            _aff = aff_mgr.getAffiliation(login=result["CRAB_UserHN"])
-        elif "x509userproxysubject" in result:
-            _aff = aff_mgr.getAffiliation(dn=result["x509userproxysubject"])
-
-        if _aff is not None:
-            result["AffiliationInstitute"] = _aff["institute"]
-            result["AffiliationCountry"] = _aff["country"]
-
-    # We will use the CRAB_PostJobStatus as the actual status.
-    # If is an analysis task and is not completed
-    # (or removed if the postjob status is not "NOT RUN"),
-    # its status is defined by Status, else it will be defined by
-    # CRAB_PostJobStatus.
-    #
-    # We will use the postjob_status_decode dict to decode
-    # the status. If there is an unknown value it will set to it.
-    # Note: if the completed task has not a committed time
-    # or completion date, we will set it using RemoteWallClockTime
-    # and EnteredCurrentStatus.
-    _pjst = result.get("CRAB_PostJobStatus", None)
-    # Sometimes there are some inconsistences in the value from CRAB
-    # to avoid this we can remove the spaces and make it uppercase.
-    _pjst = _pjst.strip().upper() if _pjst else None
-    _status = result["Status"]
-    if _pjst and (
-        (_status == "Removed" and _pjst != "NOT RUN") or (_status == "Completed")
-    ):
-        result["CRAB_PostJobStatus"] = postjob_status_decode.get(_pjst, _pjst)
-        if "CompletionDate" not in result:
-            result["CompletionDate"] = result.get("EnteredCurrentStatus")
-        if "CommittedTime" not in result or result.get("CommittedTime", 0) == 0:
-            result["CommittedTime"] = result.get("RemoteWallClockTime", 0)
-    elif 'CRAB_Id' in result: #If is an analysis or HC test task. 
-        result["CRAB_PostJobStatus"] = _status
 
     if reduce_data:
         result = drop_fields_for_running_jobs(result)
@@ -970,109 +780,13 @@ def recordTime(ad):
     return _launch_time
 
 
-def guessTaskType(ad):
-    """Guess the TaskType from the WMAgent subtask name"""
-    ttype = ad.get("WMAgent_SubTaskName", "/UNKNOWN").rsplit("/", 1)[-1]
-
-    # Guess an alternate campaign name from the subtask
-    camp2_info = ttype.split("-")
-    if len(camp2_info) > 1:
-        camp2 = camp2_info[1]
-    else:
-        camp2 = ttype
-
-    if "CleanupUnmerged" in ttype:
-        return "Cleanup"
-    elif "Merge" in ttype:
-        return "Merge"
-    elif "LogCollect" in ttype:
-        return "LogCollect"
-    elif ("MiniAOD" in ad.get("WMAgent_RequestName", "UNKNOWN")) and (
-        ttype == "StepOneProc"
-    ):
-        return "MINIAOD"
-    elif "MiniAOD" in ttype:
-        return "MINIAOD"
-    elif ttype == "StepOneProc" and (
-        ("15DR" in camp2) or ("16DR" in camp2) or ("17DR" in camp2)
-    ):
-        return "DIGIRECO"
-    elif (
-        ("15GS" in camp2) or ("16GS" in camp2) or ("17GS" in camp2)
-    ) and ttype.endswith("_0"):
-        return "GENSIM"
-    elif ttype.endswith("_0"):
-        return "DIGI"
-    elif ttype.endswith("_1") or ttype.lower() == "reco":
-        return "RECO"
-    elif ttype == "MonteCarloFromGEN":
-        return "GENSIM"
-    elif ttype in ["DataProcessing", "Repack", "Express"]:
-        return ttype
-    else:
-        return "Unknown"
-
-
-def guessCampaign(ad, analysis):
-    # Guess the campaign from the request name.
-    camp = ad.get("WMAgent_RequestName", "UNKNOWN")
-    m = _camp_re.match(camp)
-    if analysis:
-        return "crab_" + ad.get("CRAB_UserHN", "UNKNOWN")
-    elif camp.startswith("PromptReco"):
-        return "PromptReco"
-    elif camp.startswith("Repack"):
-        return "Repack"
-    elif camp.startswith("Express"):
-        return "Express"
-    elif "RVCMSSW" in camp:
-        return "RelVal"
-    elif m:
-        return m.groups()[0]
-    else:
-        m = _rereco_re.match(camp)
-        if m and ("DataProcessing" in ad.get("WMAgent_SubTaskName", "")):
-            return m.groups()[0] + "Reprocessing"
-
-    return camp
-
-
-def guessWorkflow(ad, analysis):
-    prep = ad.get("WMAgent_RequestName", "UNKNOWN")
-    m = _prep_re.match(prep)
-    if analysis:
-        return ad.get("CRAB_Workflow", "UNKNOWN").split(":", 1)[-1]
-    elif m:
-        return m.groups()[0]
-    else:
-        m = _prep_prompt_re.match(prep)
-        if m:
-            return m.groups()[0] + "_" + m.groups()[1]
-        else:
-            m = _rval_re.match(prep)
-            if m:
-                return m.groups()[0]
-
-    return prep
-
-
-def chirpCMSSWIOSiteName(key):
-    """Extract site name from ChirpCMSS_IOSite key"""
-    iosite_match = re.match(r"ChirpCMSSW(.*?)IOSite_(.*)_(ReadBytes|ReadTimeMS)", key)
-    return iosite_match.group(2), iosite_match.group(1).strip("_")
-
-
 def jobFailed(ad):
     """
     Returns 0 when none of the exitcode fields has a non-zero value
     otherwise returns 1
     """
     ec_fields = [
-        "ExitCode",
-        "Chirp_CRAB3_Job_ExitCode",
-        "Chirp_WMCore_cmsRun_ExitCode",
-        "Chirp_WMCore_cmsRun1_ExitCode",
-        "Chirp_WMCore_cmsRun2_ExitCode",
+        "ExitCode"
     ]
 
     if sum([ad.get(k, 0) for k in ec_fields]) > 0:
@@ -1082,184 +796,10 @@ def jobFailed(ad):
 
 def commonExitCode(ad):
     """
-    Consolidate the exit code values of JobExitCode, 
-    the  chirped CRAB and WMCore values, and
-    the original condor exit code.
-    JobExitCode and Chirp_CRAB3_Job_ExitCode
-    exists only on analysis jobs.
+    Consolidate the exit code values of JobExitCode 
+    and the original condor exit code.
     """
-    return ad.get(
-        "JobExitCode",
-        ad.get(
-            "Chirp_CRAB3_Job_ExitCode",
-            ad.get("Chirp_WMCore_cmsRun_ExitCode", ad.get("ExitCode", 0)),
-        ),
-    )
-
-
-def errorType(ad):
-    """
-    Categorization of exit codes into a handful of readable error types.
-
-    Allowed values are:
-    'Success', 'Environment' 'Executable', 'Stageout', 'Publication',
-    'JobWrapper', 'FileOpen', 'FileRead', 'OutOfBounds', 'Other'
-
-    This currently only works for CRAB jobs. Production jobs will always
-    fall into 'Other' as they don't have the Chirp_CRAB3_Job_ExitCode
-    """
-    if not jobFailed(ad):
-        return "Success"
-
-    exitcode = commonExitCode(ad)
-
-    if (exitcode >= 10000 and exitcode <= 19999) or exitcode == 50513:
-        return "Environment"
-
-    if exitcode >= 60000 and exitcode <= 69999:
-        if exitcode >= 69000:  ## Not yet in classads?
-            return "Publication"
-        else:
-            return "StageOut"
-
-    if exitcode >= 80000 and exitcode <= 89999:
-        return "JobWrapper"
-
-    if exitcode in [8020, 8028]:
-        return "FileOpen"
-
-    if exitcode == 8021:
-        return "FileRead"
-
-    if exitcode in [8030, 8031, 8032, 9000] or (
-        exitcode >= 50660 and exitcode <= 50669
-    ):
-        return "OutOfBounds"
-
-    if (exitcode >= 7000 and exitcode <= 9000) or exitcode == 139:
-        return "Executable"
-
-    return "Other"
-
-
-def errorClass(result):
-    """
-    Further classify error types into even broader failure classes
-    """
-    if result["ErrorType"] in [
-        "Environment",
-        "Publication",
-        "StageOut",
-        "AsyncStageOut",
-    ]:
-        return "System"
-
-    elif result["ErrorType"] in ["FileOpen", "FileRead"]:
-        return "DataAccess"
-
-    elif result["ErrorType"] in ["JobWrapper", "OutOfBounds", "Executable"]:
-        return "Application"
-
-    elif result["JobFailed"]:
-        return "Other"
-
-    return "Success"
-
-
-def handle_chirp_info(ad, result):
-    """
-    Process any data present from the Chirp ads.
-
-    Chirp statistics should be available in CMSSW_8_0_0 and later.
-    """
-    for key, val in list(result.items()):
-        if key.startswith("ChirpCMSSW") and "IOSite" in key:
-            sitename, chirpstring = chirpCMSSWIOSiteName(key)
-            keybase = key.rsplit("_", 1)[0]
-            try:
-                readbytes = result.pop(keybase + "_ReadBytes")
-                readtimems = result.pop(keybase + "_ReadTimeMS")
-                siteio = {}
-                siteio["SiteName"] = sitename
-                siteio["ChirpString"] = chirpstring
-                siteio["ReadBytes"] = readbytes
-                siteio["ReadTimeMS"] = readtimems
-                result.setdefault("ChirpCMSSW_SiteIO", []).append(siteio)
-
-            except KeyError:
-                # First hit will pop both ReadBytes and ReadTimeMS fields hence
-                # second hit will throw a KeyError that we want to ignore
-                pass
-
-            continue
-
-        if key.startswith("ChirpCMSSW_"):
-            cmssw_key = "ChirpCMSSW" + key.split("_", 2)[-1]
-            if cmssw_key not in result:
-                result[cmssw_key] = val
-            elif (
-                cmssw_key.endswith("LastUpdate")
-                or cmssw_key.endswith("Events")
-                or cmssw_key.endswith("MaxLumis")
-                or cmssw_key.endswith("MaxFiles")
-            ):
-                result[cmssw_key] = max(result[cmssw_key], val)
-            else:
-                result[cmssw_key] += val
-
-    if "ChirpCMSSWFiles" in result:
-        result["CompletedFiles"] = result["ChirpCMSSWFiles"]
-    if result.get("ChirpCMSSWMaxFiles", -1) > 0:
-        result["MaxFiles"] = result["ChirpCMSSWMaxFiles"]
-    if "ChirpCMSSWDone" in result:
-        result["CMSSWDone"] = bool(result["ChirpCMSSWDone"])
-        result["ChirpCMSSWDone"] = int(result["ChirpCMSSWDone"])
-    if "ChirpCMSSWElapsed" in result:
-        result["CMSSWWallHrs"] = result["ChirpCMSSWElapsed"] / 3600.0
-    if "ChirpCMSSWEvents" in result:
-        result["KEvents"] = result["ChirpCMSSWEvents"] / 1000.0
-        result["MegaEvents"] = result["ChirpCMSSWEvents"] / 1e6
-    if "ChirpCMSSWLastUpdate" in result:
-        # Report time since last update - this is likely stageout time for completed jobs
-        result["SinceLastCMSSWUpdateHrs"] = (
-            max(result["RecordTime"] - result["ChirpCMSSWLastUpdate"], 0) / 3600.0
-        )
-        if result["Status"] == "Completed":
-            result["StageOutHrs"] = result["SinceLastCMSSWUpdateHrs"]
-    if "ChirpCMSSWLumis" in result:
-        result["CMSSWKLumis"] = result["ChirpCMSSWLumis"] / 1000.0
-    if "ChirpCMSSWReadBytes" in result:
-        result["InputGB"] = result["ChirpCMSSWReadBytes"] / 1e9
-    if "ChirpCMSSWReadTimeMsecs" in result:
-        result["ReadTimeHrs"] = result["ChirpCMSSWReadTimeMsecs"] / 3600000.0
-        result["ReadTimeMins"] = result["ChirpCMSSWReadTimeMsecs"] / 60000.0
-    if "ChirpCMSSWWriteBytes" in result:
-        result["OutputGB"] = result["ChirpCMSSWWriteBytes"] / 1e9
-    if "ChirpCMSSWWriteTimeMsecs" in result:
-        result["WriteTimeHrs"] = result["ChirpCMSSWWriteTimeMsecs"] / 3600000.0
-        result["WriteTimeMins"] = result["ChirpCMSSWWriteTimeMsecs"] / 60000.0
-    if result.get("CMSSWDone") and (result.get("ChirpCMSSWElapsed", 0) > 0):
-        result["CMSSWEventRate"] = result.get("ChirpCMSSWEvents", 0) / float(
-            result["ChirpCMSSWElapsed"] * ad.get("RequestCpus", 1.0)
-        )
-        if result["CMSSWEventRate"] > 0:
-            result["CMSSWTimePerEvent"] = 1.0 / result["CMSSWEventRate"]
-    if result["CoreHr"] > 0:
-        result["EventRate"] = result.get("ChirpCMSSWEvents", 0) / float(
-            result["CoreHr"] * 3600.0
-        )
-        if result["EventRate"] > 0:
-            result["TimePerEvent"] = 1.0 / result["EventRate"]
-    if ("ChirpCMSSWReadOps" in result) and ("ChirpCMSSWReadSegments" in result):
-        ops = result["ChirpCMSSWReadSegments"] + result["ChirpCMSSWReadOps"]
-        if ops:
-            result["ReadOpSegmentPercent"] = (
-                result["ChirpCMSSWReadOps"] / float(ops) * 100
-            )
-    if ("ChirpCMSSWReadOps" in result) and ("ChirpCMSSWReadVOps" in result):
-        ops = result["ChirpCMSSWReadOps"] + result["ChirpCMSSWReadVOps"]
-        if ops:
-            result["ReadOpsPercent"] = result["ChirpCMSSWReadOps"] / float(ops) * 100
+    return ad.get("JobExitCode", ad.get("ExitCode", 0))
 
 
 _CONVERT_COUNT = 0
@@ -1274,14 +814,12 @@ def bulk_convert_ad_data(ad, result):
     for key in _keys:
         if key.startswith("HasBeen") and not key in bool_vals:
             continue
-        if key == "DESIRED_SITES":
-            key = "DESIRED_Sites"
         try:
             value = ad.eval(key)
         except:
             continue
         if isinstance(value, classad.Value):
-            if value == classad.Value.Error:
+            if value is classad.Value.Error:
                 continue
             else:
                 value = None
@@ -1364,30 +902,3 @@ def unique_doc_id(doc):
     with the same RecordTime
     """
     return "%s#%d" % (doc["GlobalJobId"], doc["RecordTime"])
-
-
-def get_formatted_CRAB_Id(CRAB_Id):
-    # FormattedCrabId
-    # In this field, we want to format the crab_id (if exists)
-    #  to ensure that the lexicographical order is the desired.
-    # Currently there are two CRAB_Id formats:
-    #  a positive integer or an integer tuple formated as X-N
-    #
-    # The desired order is start with the 0-N then the integer values then the
-    # 1-N...X-N
-    # To do that we will use leading zeros to ensure the lexicographical order,
-    # e.g:
-    # 0.000001,0.000002 ...0.000012, 000001,000002,....009999,010000,
-    # 1.000001....3,009999.
-    # Falls back to '000000'
-    # args: CRAB_Id
-    _cid = CRAB_Id
-    formatted = "000000"
-    try:
-        if "-" in _cid:
-            formatted = "{}.{:06d}".format(*[int(x) for x in _cid.split("-")])
-        elif _cid.isdigit():
-            formatted = "{:06d}".format(int(_cid))
-    except TypeError:
-        pass
-    return formatted

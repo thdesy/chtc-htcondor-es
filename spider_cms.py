@@ -95,9 +95,6 @@ def main():
         dest="feed_es_for_queues",
         help="Feed queue data also to Elasticsearch",
     )
-    parser.add_argument(
-        "--feed_amq", action="store_true", dest="feed_amq", help="Feed to CERN AMQ"
-    )
 
     parser.add_argument(
         "--schedd_filter",
@@ -147,13 +144,6 @@ def main():
         help="Drop all but some fields for running jobs.",
     )
     parser.add_argument(
-        "--amq_bunch_size",
-        default=5000,
-        type=int,
-        dest="amq_bunch_size",
-        help=("Send docs to AMQ in bunches of this number " "[default: %(default)d]"),
-    )
-    parser.add_argument(
         "--es_bunch_size",
         default=250,
         type=int,
@@ -186,7 +176,7 @@ def main():
 
     parser.add_argument(
         "--es_hostname",
-        default="es-cms.cern.ch",
+        default="localhost",
         type=str,
         dest="es_hostname",
         help="Hostname of the elasticsearch instance to be used "
@@ -194,19 +184,18 @@ def main():
     )
     parser.add_argument(
         "--es_port",
-        default=9203,
+        default=9200,
         type=int,
         dest="es_port",
         help="Port of the elasticsearch instance to be used " "[default: %(default)d]",
     )
     parser.add_argument(
         "--es_index_template",
-        default="cms",
+        default="htcondor",
         type=str,
         dest="es_index_template",
         help=(
             "Trunk of index pattern. "
-            "Needs to start with 'cms' "
             "[default: %(default)s]"
         ),
     )
@@ -233,13 +222,7 @@ def main():
     )
     parser.add_argument(
         "--collectors",
-        default=[
-        "cmssrv623.fnal.gov:9620",
-        "cmsgwms-collector-tier0.cern.ch:9620",
-        "cmssrv276.fnal.gov",
-        "cmsgwms-collector-itb.cern.ch",
-        "vocms0840.cern.ch"
-        ],
+        default=[],
         action="append",
         dest="collectors",
         help="Collectors' addresses",

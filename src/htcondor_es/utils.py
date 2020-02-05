@@ -42,24 +42,18 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
     Return a list of schedd ads representing all the schedds in the pool.
     """
     collectors = collectors or []
-    schedd_query = classad.ExprTree("!isUndefined(CMSGWMS_Type)")
 
     schedd_ads = {}
     for host in collectors:
         coll = htcondor.Collector(host)
         try:
-            schedds = coll.query(
-                htcondor.AdTypes.Schedd,
-                schedd_query,
-                projection=["MyAddress", "ScheddIpAddr", "Name"],
-            )
+            schedds = coll.locateAll(htcondor.DaemonTypes.Schedd)
         except IOError as e:
             logging.warning(str(e))
             continue
 
         for schedd in schedds:
             try:
-                schedd["CMS_Pool"] = pool_name
                 schedd_ads[schedd["Name"]] = schedd
             except KeyError:
                 pass
@@ -123,7 +117,6 @@ def set_up_logging(args):
     logger.setLevel(log_level)
 
     if log_level <= logging.INFO:
-        logging.getLogger("CMSMonitoring.StompAMQ").setLevel(log_level + 10)
         logging.getLogger("stomp.py").setLevel(log_level + 10)
 
     try:
