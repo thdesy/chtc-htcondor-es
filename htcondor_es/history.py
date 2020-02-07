@@ -29,7 +29,7 @@ def process_schedd(
         )
         logging.error(message)
         utils.send_email_alert(
-            args.email_alerts, "spider_cms history timeout warning", message
+            args.email_alerts, "spider history timeout warning", message
         )
         return last_completion
 
@@ -69,7 +69,7 @@ def process_schedd(
                 if not sent_warnings:
                     utils.send_email_alert(
                         args.email_alerts,
-                        "spider_cms history document conversion error",
+                        "spider history document conversion error",
                         message,
                     )
                     sent_warnings = True
@@ -108,7 +108,7 @@ def process_schedd(
                 message = f"History crawler on {schedd_ad['Name']} has been running for more than {utils.TIMEOUT_MINS:d} minutes; exiting."
                 logging.error(message)
                 utils.send_email_alert(
-                    args.email_alerts, "spider_cms history timeout warning", message
+                    args.email_alerts, "spider history timeout warning", message
                 )
                 timed_out = True
                 break
@@ -132,7 +132,7 @@ def process_schedd(
         message += f"\n{exc}"
         logging.exception(message)
         utils.send_email_alert(
-            args.email_alerts, "spider_cms schedd history query error", message
+            args.email_alerts, "spider schedd history query error", message
         )
 
     # Post the remaining ads
@@ -170,12 +170,18 @@ def process_schedd(
     return last_completion
 
 
-def update_checkpoint(name, completion_date):
+def load_checkpoint():
     try:
         with open("checkpoint.json", "r") as fd:
             checkpoint = json.load(fd)
-    except IOError as ValueError:
+    except IOError:
         checkpoint = {}
+
+    return checkpoint
+
+
+def update_checkpoint(name, completion_date):
+    checkpoint = load_checkpoint()
 
     checkpoint[name] = completion_date
 
@@ -188,10 +194,7 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
     Process history files for each schedd listed in a given
     multiprocessing pool
     """
-    try:
-        checkpoint = json.load(open("checkpoint.json"))
-    except IOError as ValueError:
-        checkpoint = {}
+    checkpoint = load_checkpoint()
 
     futures = []
     metadata = metadata or {}
@@ -243,7 +246,7 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
                 message += f"\n{exc}"
                 logging.error(message)
                 utils.send_email_alert(
-                    args.email_alerts, "spider_cms history timeout warning", message
+                    args.email_alerts, "spider history timeout warning", message
                 )
             except elasticsearch.exceptions.TransportError:
                 message = (
@@ -254,9 +257,7 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
                 message += f"\n{exc}"
                 logging.error(message)
                 utils.send_email_alert(
-                    args.email_alerts,
-                    "spider_cms history transport error warning",
-                    message,
+                    args.email_alerts, "spider history transport error warning", message
                 )
         else:
             timed_out = True

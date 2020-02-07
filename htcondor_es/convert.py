@@ -211,7 +211,6 @@ DATE_VALS = {
     "ChirpCMSSWLastUpdate",
 }
 
-
 BOOL_VALS = {
     "CurrentStatusUnknown",
     "CRAB_Publish",
@@ -423,7 +422,6 @@ NO_ANALYSIS = {
     "DAGParentNodeNames",
 }
 
-
 # Fields to be kept in docs concerning running jobs
 RUNNING_FIELDS = {
     "AccountingGroup",
@@ -579,7 +577,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
         return None
     result = {}
 
-    result["RecordTime"] = recordTime(ad)
+    result["RecordTime"] = record_time(ad)
     result["DataCollection"] = ad.get("CompletionDate", 0) or _LAUNCH_TIME
     result["DataCollectionDate"] = result["RecordTime"]
 
@@ -588,8 +586,8 @@ def to_json(ad, return_dict=False, reduce_data=False):
     bulk_convert_ad_data(ad, result)
 
     # Classify failed jobs
-    result["JobFailed"] = jobFailed(ad)
-    result["ExitCode"] = commonExitCode(ad)
+    result["JobFailed"] = job_failed(ad)
+    result["ExitCode"] = common_exit_code(ad)
     if "ExitCode" in ad:
         result["CondorExitCode"] = ad["ExitCode"]
 
@@ -597,7 +595,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
     if ad.get("JobStatus") == 2 and (ad.get("EnteredCurrentStatus", now + 1) < now):
         ad["RemoteWallClockTime"] = int(now - ad["EnteredCurrentStatus"])
         ad["CommittedTime"] = ad["RemoteWallClockTime"]
-    result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600.0
+    result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600
 
     if "RequestCpus" not in ad:
         m = _cream_re.search(ad.get("CreamAttributes", ""))
@@ -622,17 +620,17 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["RequestCpus"] = ad["RequestCpus"]
 
     result["CoreHr"] = (
-        ad.get("RequestCpus", 1.0) * int(ad.get("RemoteWallClockTime", 0)) / 3600.0
+        ad.get("RequestCpus", 1.0) * int(ad.get("RemoteWallClockTime", 0)) / 3600
     )
     result["CommittedCoreHr"] = (
-        ad.get("RequestCpus", 1.0) * ad.get("CommittedTime", 0) / 3600.0
+        ad.get("RequestCpus", 1.0) * ad.get("CommittedTime", 0) / 3600
     )
-    result["CommittedWallClockHr"] = ad.get("CommittedTime", 0) / 3600.0
+    result["CommittedWallClockHr"] = ad.get("CommittedTime", 0) / 3600
     result["CpuTimeHr"] = (
         ad.get("RemoteSysCpu", 0) + ad.get("RemoteUserCpu", 0)
     ) / 3600.0
-    result["DiskUsageGB"] = ad.get("DiskUsage_RAW", 0) / 1000000.0
-    result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024.0
+    result["DiskUsageGB"] = ad.get("DiskUsage_RAW", 0) / 1000000
+    result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
 
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
@@ -664,15 +662,15 @@ def to_json(ad, return_dict=False, reduce_data=False):
             100
             * result["CpuTimeHr"]
             / result["WallClockHr"]
-            / float(ad.get("RequestCpus", 1.0))
+            / ad.get("RequestCpus", 1.0)
         )
     result["Status"] = STATUS.get(ad.get("JobStatus"), "Unknown")
     result["Universe"] = UNIVERSE.get(ad.get("JobUniverse"), "Unknown")
     result["QueueHrs"] = (
         ad.get("JobCurrentStartDate", time.time()) - ad["QDate"]
-    ) / 3600.0
-    result["Badput"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0.0)
-    result["CpuBadput"] = max(result["CoreHr"] - result["CpuTimeHr"], 0.0)
+    ) / 3600
+    result["Badput"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0)
+    result["CpuBadput"] = max(result["CoreHr"] - result["CpuTimeHr"], 0)
 
     # Parse new machine statistics.
     try:
@@ -699,6 +697,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
         result["HS06CpuTimeHr"] = result["CpuTimeHr"] * result["BenchmarkJobHS06"]
     except:
         result.pop("MachineAttrMJF_JOB_HS06_JOB0", None)
+
     if ("MachineAttrDIRACBenchmark0" in ad) and classad.ExprTree(
         "MachineAttrDIRACBenchmark0 isnt undefined"
     ).eval(ad):
@@ -741,7 +740,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
         return json.dumps(result)
 
 
-def recordTime(ad):
+def record_time(ad):
     """
     RecordTime falls back to launch time as last-resort and for jobs in the queue
 
@@ -760,7 +759,7 @@ def recordTime(ad):
     return _LAUNCH_TIME
 
 
-def jobFailed(ad):
+def job_failed(ad):
     """
     Returns 0 when none of the exitcode fields has a non-zero value
     otherwise returns 1
@@ -772,7 +771,7 @@ def jobFailed(ad):
     return 0
 
 
-def commonExitCode(ad):
+def common_exit_code(ad):
     """
     Consolidate the exit code values of JobExitCode
     and the original condor exit code.
@@ -790,12 +789,13 @@ def bulk_convert_ad_data(ad, result):
     """
     _keys = set(ad.keys()) - IGNORE
     for key in _keys:
-        if key.startswith("HasBeen") and not key in BOOL_VALS:
+        if key.startswith("HasBeen") and key not in BOOL_VALS:
             continue
         try:
             value = ad.eval(key)
         except:
             continue
+
         if isinstance(value, classad.Value):
             if value is classad.Value.Error:
                 continue
@@ -811,8 +811,7 @@ def bulk_convert_ad_data(ad, result):
                     value = None
                 else:
                     logging.warning(
-                        "Failed to convert key %s with value %s to int"
-                        % (key, repr(value))
+                        f"Failed to convert key {key} with value {repr(value)} to int"
                     )
                     continue
         elif key in STRING_VALS:
@@ -829,6 +828,7 @@ def bulk_convert_ad_data(ad, result):
                         % (key, repr(value))
                     )
                     value = None
+
         # elif key in date_vals:
         #    value = datetime.datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
         if key.startswith("MATCH_EXP_JOB_"):
@@ -837,16 +837,15 @@ def bulk_convert_ad_data(ad, result):
             key = key[: -len("_RAW")]
         if _wmcore_exe_exmsg.match(key):
             value = str(decode_and_decompress(value))
+
         result[key] = value
 
 
 def decode_and_decompress(value):
     try:
-        value = str(zlib.decompress(base64.b64decode(value)))
+        return str(zlib.decompress(base64.b64decode(value)))
     except (TypeError, zlib.error):
-        logging.warning("Failed to decode and decompress value: %s" % (repr(value)))
-
-    return value
+        logging.warning(f"Failed to decode and decompress value: {repr(value)}")
 
 
 def convert_dates_to_millisecs(record):

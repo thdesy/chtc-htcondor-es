@@ -28,7 +28,7 @@ class ListenAndBunch(multiprocessing.Process):
         input_queue,
         output_queue,
         n_expected,
-        starttime,
+        start_time,
         bunch_size=5000,
         report_every=50000,
     ):
@@ -37,8 +37,8 @@ class ListenAndBunch(multiprocessing.Process):
         self.output_queue = output_queue
         self.bunch_size = bunch_size
         self.report_every = report_every
-        self.n_expected = n_expected
-        self.starttime = starttime
+        self.num_expected = n_expected
+        self.start_time = start_time
 
         self.buffer = []
         self.tracker = []
@@ -52,7 +52,7 @@ class ListenAndBunch(multiprocessing.Process):
         while True:
             try:
                 next_batch = self.input_queue.get(
-                    timeout=utils.time_remaining(self.starttime - 5)
+                    timeout=utils.time_remaining(self.start_time - 5)
                 )
             except queue.Empty:
                 logging.warning("Closing listener before all schedds were processed")
@@ -70,11 +70,12 @@ class ListenAndBunch(multiprocessing.Process):
                     # This is a new sender
                     self.tracker.append(schedd_name)
 
-                if self.n_processed == self.n_expected:
+                if self.n_processed == self.num_expected:
                     # We finished processing all expected senders.
                     assert len(self.tracker) == 0
                     self.close()
                     return
+
                 continue
 
             self.count_in += len(next_batch)
@@ -89,7 +90,7 @@ class ListenAndBunch(multiprocessing.Process):
             if len(self.buffer) >= self.bunch_size:
                 self.output_queue.put(
                     self.buffer[: self.bunch_size],
-                    timeout=utils.time_remaining(self.starttime),
+                    timeout=utils.time_remaining(self.start_time),
                 )
                 self.buffer = self.buffer[self.bunch_size :]
 
@@ -97,16 +98,16 @@ class ListenAndBunch(multiprocessing.Process):
         """Clear the buffer, send a poison pill and the total number of docs"""
         if self.buffer:
             self.output_queue.put(
-                self.buffer, timeout=utils.time_remaining(self.starttime)
+                self.buffer, timeout=utils.time_remaining(self.start_time)
             )
             self.buffer = []
 
         logging.warning("Closing listener, received %d documents total", self.count_in)
         # send back a poison pill
-        self.output_queue.put(None, timeout=utils.time_remaining(self.starttime))
+        self.output_queue.put(None, timeout=utils.time_remaining(self.start_time))
         # send the number of total docs
         self.output_queue.put(
-            self.count_in, timeout=utils.time_remaining(self.starttime)
+            self.count_in, timeout=utils.time_remaining(self.start_time)
         )
 
 
@@ -120,7 +121,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
         )
         logging.error(message)
         utils.send_email_alert(
-            args.email_alerts, "spider_cms queue timeout warning", message
+            args.email_alerts, "spider queue timeout warning", message
         )
         return
 
@@ -135,12 +136,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
     # Query for a snapshot of the jobs running/idle/held,
     # but only the completed that had changed in the last period of time.
     _completed_since = starttime - (utils.TIMEOUT_MINS + 1) * 60
-    query = """
-         (JobStatus < 3 || JobStatus > 4 
-         || EnteredCurrentStatus >= %(completed_since)d)
-         """ % {
-        "completed_since": _completed_since
-    }
+    query = f"(JobStatus < 3 || JobStatus > 4 || EnteredCurrentStatus >= {_completed_since:d})"
     try:
         query_iter = schedd.xquery(requirements=query) if not args.dry_run else []
         for job_ad in query_iter:
@@ -155,7 +151,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
                 if not sent_warnings:
                     utils.send_email_alert(
                         args.email_alerts,
-                        "spider_cms queue document conversion error",
+                        "spider queue document conversion error",
                         message,
                     )
                     sent_warnings = True
@@ -176,7 +172,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
                     )
                     logging.error(message)
                     utils.send_email_alert(
-                        args.email_alerts, "spider_cms queue timeout warning", message
+                        args.email_alerts, "spider queue timeout warning", message
                     )
                     break
                 queue.put(batch, timeout=utils.time_remaining(starttime))
@@ -212,7 +208,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
         )
         logging.error(message)
         utils.send_email_alert(
-            args.email_alerts, "spider_cms schedd queue query error", message
+            args.email_alerts, "spider schedd queue query error", message
         )
         traceback.print_exc()
 
@@ -251,7 +247,7 @@ def process_queues(schedd_ads, starttime, pool, args, metadata=None):
         input_queue=input_queue,
         output_queue=output_queue,
         n_expected=len(schedd_ads),
-        starttime=starttime,
+        start_time=starttime,
     )
     futures = []
 
@@ -317,7 +313,7 @@ def process_queues(schedd_ads, starttime, pool, args, metadata=None):
                 message = "Schedd %s queue timed out; ignoring progress." % name
                 logging.error(message)
                 utils.send_email_alert(
-                    args.email_alerts, "spider_cms queue timeout warning", message
+                    args.email_alerts, "spider queue timeout warning", message
                 )
         else:
             timed_out = True

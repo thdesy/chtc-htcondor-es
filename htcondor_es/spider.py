@@ -18,7 +18,7 @@ def main_driver(args):
     """
     starttime = time.time()
 
-    signal.alarm((utils.TIMEOUT_MINS) * 60 + 60)
+    signal.alarm(utils.TIMEOUT_MINS * 60 + 60)
 
     # Get all the schedd ads
     schedd_ads = []

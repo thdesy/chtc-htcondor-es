@@ -6,6 +6,7 @@ import time
 import datetime
 import logging
 import socket
+import collections
 
 import elasticsearch
 
@@ -192,16 +193,13 @@ def make_es_body(ads, metadata=None):
 
 
 def parse_errors(result):
-    from collections import Counter
-
     reasons = [
         d.get("index", {}).get("error", {}).get("reason", None) for d in result["items"]
     ]
-    counts = Counter([_f for _f in reasons if _f])
+    counts = collections.Counter([_f for _f in reasons if _f])
     n_failed = sum(counts.values())
     logging.error(
-        "Failed to index %d documents to ES: %s"
-        % (n_failed, str(counts.most_common(3)))
+        f"Failed to index {n_failed:d} documents to ES: {str(counts.most_common(3))}"
     )
     return n_failed
 

@@ -122,7 +122,7 @@ def set_up_logging(args):
         if oserr.errno != errno.EEXIST:
             raise
 
-    log_file = os.path.join(args.log_dir, "spider_cms.log")
+    log_file = os.path.join(args.log_dir, "spider.log")
     filehandler = logging.handlers.RotatingFileHandler(log_file, maxBytes=100000)
     filehandler.setFormatter(
         logging.Formatter("%(asctime)s : %(name)s:%(levelname)s - %(message)s")
