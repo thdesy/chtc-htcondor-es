@@ -66,9 +66,9 @@ def load_config(args):
         sys.exit(1)
 
     if (args.collectors is None) and ('COLLECTORS' in config) and (len(list(config['COLLECTORS'])) > 0):
-        args.collectors = list(config['COLLECTORS'])
+        args.collectors = ','.join(list(config['COLLECTORS']))
     if (args.schedds is None) and ('SCHEDDS' in config) and (len(list(config['SCHEDDS'])) > 0):
-        args.schedds = list(config['SCHEDDS'])
+        args.schedds = ','.join(list(config['SCHEDDS']))
     if 'PROCESS' in config:
         process = config['PROCESS']
         if (args.process_schedd_history is None):
@@ -112,11 +112,11 @@ def load_config(args):
     return args
 
 
-def get_schedds(args=None, collectors=None, pool_name="Unknown"):
+def get_schedds(args, pool_name="Unknown"):
     """
     Return a list of schedd ads representing all the schedds in the pool.
     """
-    collectors = collectors or []
+    collectors = args.collectors.split(',') or []
 
     schedd_ads = {}
     for host in collectors:
