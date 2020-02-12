@@ -65,9 +65,9 @@ def load_config(args):
         logging.exception("Fatal error while reading config file")
         sys.exit(1)
 
-    if (args.collectors is None) and ('COLLECTORS' in config) and len(list(config['COLLECTORS']) > 0):
+    if (args.collectors is None) and ('COLLECTORS' in config) and (len(list(config['COLLECTORS'])) > 0):
         args.collectors = list(config['COLLECTORS'])
-    if (args.schedds is None) and ('SCHEDDS' in config) and len(list(config['SCHEDDS']) > 0):
+    if (args.schedds is None) and ('SCHEDDS' in config) and (len(list(config['SCHEDDS'])) > 0):
         args.schedds = list(config['SCHEDDS'])
     if 'PROCESS' in config:
         process = config['PROCESS']
