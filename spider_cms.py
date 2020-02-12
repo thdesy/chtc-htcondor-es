@@ -84,7 +84,7 @@ def main():
         help=(
             "File containing configuration for the spider script. "
             "Config file values will be overridden by commandline arguments."
-        )
+        ),
     )
     parser.add_argument(
         "--collectors",
@@ -126,20 +126,25 @@ def main():
         dest="process_parallel_queries",
         help=(
             "Number of parallel processes for querying "
-            "[default: {}]".format(defaults['process_parallel_queries']),
+            "[default: {}]".format(defaults['process_parallel_queries'])
+        ),
     )
     parser.add_argument(
         "--es_host",
         dest="es_host",
-        help="Host of the Elasticsearch instance to be used "
-        "[default: {}]".format(defaults['es_host']),
+        help=(
+            "Host of the Elasticsearch instance to be used "
+            "[default: {}]".format(defaults['es_host'])
+        ),
     )
     parser.add_argument(
         "--es_port",
         type=int,
         dest="es_port",
-        help="Port of the Elasticsearch instance to be used "
-        "[default: {}]".format(defaults['es_port']),
+        help=(
+            "Port of the Elasticsearch instance to be used "
+            "[default: {}]".format(defaults['es_port'])
+        )
     )
     parser.add_argument(
         "--es_bunch_size",
@@ -147,7 +152,8 @@ def main():
         dest="es_bunch_size",
         help=(
             "Send docs to ES in bunches of this number "
-            "[default: {}]".format(defaults['es_bunch_size']),
+            "[default: {}]".format(defaults['es_bunch_size'])
+        )
     )
     parser.add_argument(
         "--es_feed_schedd_history",
@@ -172,8 +178,10 @@ def main():
     parser.add_argument(
         "--es_index_date_attr",
         dest="es_index_date_attr",
-        help="Job attribute to use as date for Elasticsearch index name "
-        "[default: {}]".format(defaults['es_index_date_attr']),
+        help=(
+            "Job attribute to use as date for Elasticsearch index name "
+            "[default: {}]".format(defaults['es_index_date_attr'])
+        ),
     )
     parser.add_argument(
         "--query_queue_batch_size",
@@ -181,7 +189,8 @@ def main():
         type=int,
         dest="query_queue_batch_size",
         help=(
-            "Send docs to listener in batches of this number " "[default: %(default)d]"
+            "Send docs to listener in batches of this number "
+            "[default: %(default)d]"
         ),
     )
     parser.add_argument(
@@ -195,28 +204,40 @@ def main():
         default=8,
         type=int,
         dest="upload_pool_size",
-        help=("Number of parallel processes for uploading " "[default: %(default)d]"),
+        help=(
+            "Number of parallel processes for uploading "
+            "[default: %(default)d]"
+        ),
     )
     parser.add_argument(
         "--log_dir",
         default="log/",
         type=str,
         dest="log_dir",
-        help="Directory for logging information [default: %(default)s]",
+        help=(
+            "Directory for logging information "
+            "[default: %(default)s]"
+        ),
     )
     parser.add_argument(
         "--log_level",
         default="WARNING",
         type=str,
         dest="log_level",
-        help="Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) " "[default: %(default)s]",
+        help=(
+            "Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) "
+            "[default: %(default)s]"
+        ),
     )
     parser.add_argument(
         "--email_alerts",
         default=[],
         action="append",
         dest="email_alerts",
-        help="Email addresses for alerts [default: none]",
+        help=(
+            "Email addresses for alerts "
+            "[default: none]"
+        ),
     )
     parser.add_argument(
         "--read_only",
