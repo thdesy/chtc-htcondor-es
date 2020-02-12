@@ -116,7 +116,11 @@ def get_schedds(args, pool_name="Unknown"):
     """
     Return a list of schedd ads representing all the schedds in the pool.
     """
-    collectors = args.collectors.split(',') or []
+    collectors = args.collectors
+    if collectors:
+        collectors = collectors.split(',')
+    else:
+        collectors = []
 
     schedd_ads = {}
     for host in collectors:
