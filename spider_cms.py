@@ -34,7 +34,7 @@ def main_driver(args):
 
     # Get all the schedd ads
     schedd_ads = []
-    schedd_ads = get_schedds(args, collectors=args.collectors)
+    schedd_ads = get_schedds(args)
     logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
 
     pool = multiprocessing.Pool(processes=args.process_parallel_queries)
