@@ -101,13 +101,15 @@ def main():
     )
     parser.add_argument(
         "--skip_process_schedd_history",
-        action="store_false",
+        action="store_const",
+        const=False,
         dest="process_schedd_history",
         help="Do not process Schedd history"
     )
     parser.add_argument(
         "--process_schedd_queue",
-        action="store_true",
+        action="store_const",
+        const=True,
         dest="process_schedd_queue",
         help="Process Schedd queue (Running/Idle/Pending jobs)",
     )
@@ -157,13 +159,15 @@ def main():
     )
     parser.add_argument(
         "--es_feed_schedd_history",
-        action="store_true",
+        action="store_const",
+        const=True,
         dest="es_feed_schedd_history",
         help="Feed Schedd history to Elasticsearch"
     )
     parser.add_argument(
         "--es_feed_schedd_queue",
-        action="store_true",
+        action="store_const",
+        const=True,
         dest="es_feed_schedd_queue",
         help="Feed Schedd queue to Elasticsearch",
     )
