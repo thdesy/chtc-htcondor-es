@@ -19,7 +19,8 @@ except ImportError:
 
 import htcondor_es.history
 import htcondor_es.queues
-from htcondor_es.utils import get_schedds, get_schedds_from_file, set_up_logging, send_email_alert
+from htcondor_es.utils import default_config, load_config
+from htcondor_es.utils import get_schedds, set_up_logging, send_email_alert
 from htcondor_es.utils import collect_metadata, TIMEOUT_MINS
 
 
@@ -33,18 +34,14 @@ def main_driver(args):
 
     # Get all the schedd ads
     schedd_ads = []
-    if args.collectors_file:
-        schedd_ads = get_schedds_from_file(args, collectors_file=args.collectors_file)
-        del args.collectors_file #sending a file through postprocessing will cause problems. 
-    else:
-        schedd_ads = get_schedds(args, collectors=args.collectors)
+    schedd_ads = get_schedds(args, collectors=args.collectors)
     logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
 
-    pool = multiprocessing.Pool(processes=args.query_pool_size)
+    pool = multiprocessing.Pool(processes=args.process_parallel_queries)
 
     metadata = collect_metadata()
 
-    if not args.skip_history:
+    if args.process_schedd_history:
         htcondor_es.history.process_histories(
             schedd_ads=schedd_ads,
             starttime=starttime,
@@ -54,7 +51,7 @@ def main_driver(args):
         )
 
     # Now that we have the fresh history, process the queues themselves.
-    if args.process_queue:
+    if args.process_schedd_queue:
         htcondor_es.queues.process_queues(
             schedd_ads=schedd_ads,
             starttime=starttime,
@@ -79,76 +76,104 @@ def main():
 
     Parses arguments and invokes main_driver
     """
+    defaults = default_config()
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--process_queue",
-        action="store_true",
-        dest="process_queue",
-        help="Process also schedd queue (Running/Idle/Pending jobs)",
-    )
-    parser.add_argument(
-        "--feed_es", action="store_true", dest="feed_es", help="Feed to Elasticsearch"
-    )
-    parser.add_argument(
-        "--feed_es_for_queues",
-        action="store_true",
-        dest="feed_es_for_queues",
-        help="Feed queue data also to Elasticsearch",
-    )
-
-    parser.add_argument(
-        "--schedd_filter",
-        default="",
-        type=str,
-        dest="schedd_filter",
+        "--config_file",
+        dest="config_file",
         help=(
-            "Comma separated list of schedd names to process "
-            "[default is to process all]"
+            "File containing configuration for the spider script. "
+            "Config file values will be overridden by commandline arguments."
+        )
+    )
+    parser.add_argument(
+        "--collectors",
+        dest="collectors",
+        help="Comma-separated list of Collector addresses used to locate Schedds",
+    )
+    parser.add_argument(
+        "--schedds",
+        dest="schedds",
+        help=(
+            "Comma-separated list of Schedd names to process "
+            "[default is to process all Schedds located by Collectors]"
         ),
     )
     parser.add_argument(
-        "--skip_history",
-        action="store_true",
-        dest="skip_history",
-        help="Skip processing the history. (Only do queues.)",
+        "--skip_process_schedd_history",
+        action="store_false",
+        dest="process_schedd_history",
+        help="Do not process Schedd history"
     )
     parser.add_argument(
-        "--read_only",
+        "--process_schedd_queue",
         action="store_true",
-        dest="read_only",
-        help="Only read the info, don't submit it.",
+        dest="process_schedd_queue",
+        help="Process Schedd queue (Running/Idle/Pending jobs)",
     )
     parser.add_argument(
-        "--dry_run",
-        action="store_true",
-        dest="dry_run",
-        help=(
-            "Don't even read info, just pretend to. (Still "
-            "query the collector for the schedd's though.)"
-        ),
-    )
-    parser.add_argument(
-        "--max_documents_to_process",
-        default=0,
+        "--process_max_documents",
         type=int,
-        dest="max_documents_to_process",
+        dest="process_max_documents",
         help=(
-            "Abort after this many documents (per schedd). "
-            "[default: %(default)d (process all)]"
+            "Abort after this many documents (per Schedd). "
+            "[default: {} (process all)]".format(defaults['process_max_documents'])
         ),
     )
     parser.add_argument(
-        "--keep_full_queue_data",
-        action="store_true",
-        dest="keep_full_queue_data",
-        help="Drop all but some fields for running jobs.",
+        "--process_parallel_queries",
+        type=int,
+        dest="process_parallel_queries",
+        help=(
+            "Number of parallel processes for querying "
+            "[default: {}]".format(defaults['process_parallel_queries']),
+    )
+    parser.add_argument(
+        "--es_host",
+        dest="es_host",
+        help="Host of the Elasticsearch instance to be used "
+        "[default: {}]".format(defaults['es_host']),
+    )
+    parser.add_argument(
+        "--es_port",
+        type=int,
+        dest="es_port",
+        help="Port of the Elasticsearch instance to be used "
+        "[default: {}]".format(defaults['es_port']),
     )
     parser.add_argument(
         "--es_bunch_size",
-        default=250,
         type=int,
         dest="es_bunch_size",
-        help=("Send docs to ES in bunches of this number " "[default: %(default)d]"),
+        help=(
+            "Send docs to ES in bunches of this number "
+            "[default: {}]".format(defaults['es_bunch_size']),
+    )
+    parser.add_argument(
+        "--es_feed_schedd_history",
+        action="store_true",
+        dest="es_feed_schedd_history",
+        help="Feed Schedd history to Elasticsearch"
+    )
+    parser.add_argument(
+        "--es_feed_schedd_queue",
+        action="store_true",
+        dest="es_feed_schedd_queue",
+        help="Feed Schedd queue to Elasticsearch",
+    )
+    parser.add_argument(
+        "--es_index_name",
+        dest="es_index_name",
+        help=(
+            "Trunk of Elasticsearch index name. "
+            "[default: {}]".format(defaults['es_index_name'])
+        ),
+    )
+    parser.add_argument(
+        "--es_index_date_attr",
+        dest="es_index_date_attr",
+        help="Job attribute to use as date for Elasticsearch index name "
+        "[default: {}]".format(defaults['es_index_date_attr']),
     )
     parser.add_argument(
         "--query_queue_batch_size",
@@ -160,44 +185,17 @@ def main():
         ),
     )
     parser.add_argument(
+        "--keep_full_queue_data",
+        action="store_true",
+        dest="keep_full_queue_data",
+        help="Drop all but some fields for running jobs.",
+    )
+    parser.add_argument(
         "--upload_pool_size",
         default=8,
         type=int,
         dest="upload_pool_size",
         help=("Number of parallel processes for uploading " "[default: %(default)d]"),
-    )
-    parser.add_argument(
-        "--query_pool_size",
-        default=8,
-        type=int,
-        dest="query_pool_size",
-        help=("Number of parallel processes for querying " "[default: %(default)d]"),
-    )
-
-    parser.add_argument(
-        "--es_hostname",
-        default="localhost",
-        type=str,
-        dest="es_hostname",
-        help="Hostname of the elasticsearch instance to be used "
-        "[default: %(default)s]",
-    )
-    parser.add_argument(
-        "--es_port",
-        default=9200,
-        type=int,
-        dest="es_port",
-        help="Port of the elasticsearch instance to be used " "[default: %(default)d]",
-    )
-    parser.add_argument(
-        "--es_index_template",
-        default="htcondor",
-        type=str,
-        dest="es_index_template",
-        help=(
-            "Trunk of index pattern. "
-            "[default: %(default)s]"
-        ),
     )
     parser.add_argument(
         "--log_dir",
@@ -221,26 +219,26 @@ def main():
         help="Email addresses for alerts [default: none]",
     )
     parser.add_argument(
-        "--collectors",
-        default=[],
-        action="append",
-        dest="collectors",
-        help="Collectors' addresses",
+        "--read_only",
+        action="store_true",
+        dest="read_only",
+        help="Only read the info, don't submit it.",
     )
     parser.add_argument(
-        "--collectors_file",
-        default=None,
-        action="store",
-        type=argparse.FileType('r'),
-        dest="collectors_file",
-        help="FIle defining the pools and collectors",
+        "--dry_run",
+        action="store_true",
+        dest="dry_run",
+        help=(
+            "Don't even read info, just pretend to. (Still "
+            "query the collector for the Schedds though.)"
+        ),
     )
     args = parser.parse_args()
+    args = load_config(args)
     set_up_logging(args)
 
     # --dry_run implies read_only
     args.read_only = args.read_only or args.dry_run
-
     main_driver(args)
 
 
