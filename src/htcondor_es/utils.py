@@ -136,8 +136,8 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
     schedd_ads = list(schedd_ads.values())
     random.shuffle(schedd_ads)
 
-    if args and args.schedd_filter:
-        return [s for s in schedd_ads if s["Name"] in args.schedd_filter.split(",")]
+    if args and args.schedds:
+        return [s for s in schedd_ads if s["Name"] in args.schedds.split(",")]
 
     return schedd_ads
 
