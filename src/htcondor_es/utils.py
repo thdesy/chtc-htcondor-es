@@ -89,9 +89,9 @@ def load_config(args):
             args.es_host = es.get('host', fallback=defaults['es_host'])
         if (args.es_port is None):
             args.es_port = es.get('port', fallback=defaults['es_port'])
-        if (args.es_username is None):
+        if ('es_username' in args and args.es_username is None):
             args.es_username = es.get('username', fallback=None)
-        if (args.es_password is None):
+        if ('es_password' in args and args.es_password is None):
             args.es_password = es.get('password', fallback=None)
         if (args.es_bunch_size is None):
             args.es_bunch_size = es.getint(
