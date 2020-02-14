@@ -35,10 +35,7 @@ def process_schedd(
 
     metadata = metadata or {}
     schedd = htcondor.Schedd(schedd_ad)
-    _q = """
-        ( EnteredCurrentStatus >= %(last_completion)d )
-        """
-    history_query = classad.ExprTree(_q % {"last_completion": last_completion})
+    history_query = classad.ExprTree(f"( EnteredCurrentStatus >= {last_completion:d} )")
     logging.info(
         "Querying %s for history: %s.  " "%.1f minutes of ads",
         schedd_ad["Name"],
@@ -153,8 +150,7 @@ def process_schedd(
         "%Y-%m-%d %H:%M:%S"
     )
     logging.warning(
-        "Schedd %-25s history: response count: %5d; last completion %s; "
-        "query time %.2f min; upload time %.2f min",
+        "Schedd %-25s history: response count: %5d; last completion %s; query time %.2f min; upload time %.2f min",
         schedd_ad["Name"],
         count,
         last_formatted,

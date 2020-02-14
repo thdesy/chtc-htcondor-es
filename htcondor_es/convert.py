@@ -557,19 +557,19 @@ def make_list_from_string_field(ad, key, split_re=r"[\s,]+\s*", default=None):
         return default
 
 
-_cream_re = re.compile(r"CPUNumber = (\d+)")
-_nordugrid_re = re.compile(r"\(count=(\d+)\)")
-_camp_re = re.compile(r"[A-Za-z0-9_]+_[A-Z0-9]+-([A-Za-z0-9]+)-")
-_prep_re = re.compile(r"[A-Za-z0-9_]+_([A-Z]+-([A-Za-z0-9]+)-[0-9]+)")
-_rval_re = re.compile(r"[A-Za-z0-9]+_(RVCMSSW_[0-9]+_[0-9]+_[0-9]+)")
-_prep_prompt_re = re.compile(r"(PromptReco|Repack|Express)_[A-Za-z0-9]+_([A-Za-z0-9]+)")
+CREAM_RE = re.compile(r"CPUNumber = (\d+)")
+NORDUGRID_RE = re.compile(r"\(count=(\d+)\)")
+CAMP_RE = re.compile(r"[A-Za-z0-9_]+_[A-Z0-9]+-([A-Za-z0-9]+)-")
+PREP_RE = re.compile(r"[A-Za-z0-9_]+_([A-Z]+-([A-Za-z0-9]+)-[0-9]+)")
+RVAL_RE = re.compile(r"[A-Za-z0-9]+_(RVCMSSW_[0-9]+_[0-9]+_[0-9]+)")
+PREP_PROMPT_RE = re.compile(r"(PromptReco|Repack|Express)_[A-Za-z0-9]+_([A-Za-z0-9]+)")
 # Executable error messages in WMCore
-_wmcore_exe_exmsg = re.compile(r"^Chirp_WMCore_[A-Za-z0-9]+_Exception_Message$")
+WMCORE_EXE_EXMSG_RE = re.compile(r"^Chirp_WMCore_[A-Za-z0-9]+_Exception_Message$")
 # 2016 reRECO; of the form cerminar_Run2016B-v2-JetHT-23Sep2016_8020_160923_164036_4747
-_rereco_re = re.compile(r"[A-Za-z0-9_]+_Run20[A-Za-z0-9-_]+-([A-Za-z0-9]+)")
-_generic_site = re.compile(r"^[A-Za-z0-9]+_[A-Za-z0-9]+_(.*)_")
-_cms_site = re.compile(r"CMS[A-Za-z]*_(.*)_")
-_cmssw_version = re.compile(r"CMSSW_((\d*)_(\d*)_.*)")
+RERECO_RE = re.compile(r"[A-Za-z0-9_]+_Run20[A-Za-z0-9-_]+-([A-Za-z0-9]+)")
+GENERIC_SITE_RE = re.compile(r"^[A-Za-z0-9]+_[A-Za-z0-9]+_(.*)_")
+CMS_SITE_RE = re.compile(r"CMS[A-Za-z]*_(.*)_")
+CMSSW_VERSION = re.compile(r"CMSSW_((\d*)_(\d*)_.*)")
 
 
 def to_json(ad, return_dict=False, reduce_data=False):
@@ -598,8 +598,8 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600
 
     if "RequestCpus" not in ad:
-        m = _cream_re.search(ad.get("CreamAttributes", ""))
-        m2 = _nordugrid_re.search(ad.get("NordugridRSL"))
+        m = CREAM_RE.search(ad.get("CreamAttributes", ""))
+        m2 = NORDUGRID_RE.search(ad.get("NordugridRSL"))
         if m:
             try:
                 ad["RequestCpus"] = int(m.groups()[0])
@@ -637,8 +637,8 @@ def to_json(ad, return_dict=False, reduce_data=False):
     if "x509UserProxyVOName" in ad:
         result["VO"] = str(ad["x509UserProxyVOName"])
     elif ("GlideinEntryName" in ad) and ("MATCH_EXP_JOBGLIDEIN_ResourceName" not in ad):
-        m = _generic_site.match(ad["GlideinEntryName"])
-        m2 = _cms_site.match(ad["GlideinEntryName"])
+        m = GENERIC_SITE_RE.match(ad["GlideinEntryName"])
+        m2 = CMS_SITE_RE.match(ad["GlideinEntryName"])
         if m2:
             result["Site"] = m2.groups()[0]
             info = result["Site"].split("_", 2)
@@ -835,7 +835,7 @@ def bulk_convert_ad_data(ad, result):
             key = key[len("MATCH_EXP_JOB_") :]
         if key.endswith("_RAW"):
             key = key[: -len("_RAW")]
-        if _wmcore_exe_exmsg.match(key):
+        if WMCORE_EXE_EXMSG_RE.match(key):
             value = str(decode_and_decompress(value))
 
         result[key] = value
