@@ -13,37 +13,29 @@ import classad
 import htcondor
 import elasticsearch
 
-import htcondor_es.es
-from htcondor_es.utils import send_email_alert, time_remaining, TIMEOUT_MINS
-from htcondor_es.convert_to_json import convert_to_json
-from htcondor_es.convert_to_json import convert_dates_to_millisecs
-from htcondor_es.convert_to_json import unique_doc_id
+from . import elastic, utils, convert
 
 
 def process_schedd(
-    starttime, last_completion, checkpoint_queue, schedd_ad, args, metadata=None
+    start_time, last_completion, checkpoint_queue, schedd_ad, args, metadata=None
 ):
     """
     Given a schedd, process its entire set of history since last checkpoint.
     """
     my_start = time.time()
-    if time_remaining(starttime) < 0:
+    if utils.time_remaining(start_time) < 0:
         message = (
             "No time remaining to process %s history; exiting." % schedd_ad["Name"]
         )
         logging.error(message)
-        send_email_alert(
-            args.email_alerts, "spider_cms history timeout warning", message
+        utils.send_email_alert(
+            args.email_alerts, "spider history timeout warning", message
         )
         return last_completion
 
     metadata = metadata or {}
     schedd = htcondor.Schedd(schedd_ad)
-    _q = ("""
-        ( EnteredCurrentStatus >= %(last_completion)d )
-        """
-    )
-    history_query = classad.ExprTree(_q % {"last_completion": last_completion})
+    history_query = classad.ExprTree(f"( EnteredCurrentStatus >= {last_completion:d} )")
     logging.info(
         "Querying %s for history: %s.  " "%.1f minutes of ads",
         schedd_ad["Name"],
@@ -55,9 +47,8 @@ def process_schedd(
     total_upload = 0
     sent_warnings = False
     timed_out = False
-    if not args.read_only:
-        if args.feed_es:
-            es = htcondor_es.es.get_server_handle(args)
+    if not args.read_only and args.feed_es:
+        es = elastic.get_server_handle(args)
     try:
         if not args.dry_run:
             history_iter = schedd.history(history_query, [], 10000)
@@ -65,43 +56,35 @@ def process_schedd(
             history_iter = []
 
         for job_ad in history_iter:
-            dict_ad = None
             try:
-                dict_ad = convert_to_json(job_ad, return_dict=True)
+                dict_ad = convert.to_json(job_ad, return_dict=True)
             except Exception as e:
-                message = "Failure when converting document on %s history: %s" % (
-                    schedd_ad["Name"],
-                    str(e),
-                )
+                message = f"Failure when converting document on {schedd_ad['Name']} history: {e}"
                 exc = traceback.format_exc()
-                message += '\n{}'.format(exc)
+                message += f"\n{exc}"
                 logging.warning(message)
                 if not sent_warnings:
-                    send_email_alert(
+                    utils.send_email_alert(
                         args.email_alerts,
-                        "spider_cms history document conversion error",
+                        "spider history document conversion error",
                         message,
                     )
                     sent_warnings = True
 
-            if not dict_ad:
                 continue
 
-            idx = htcondor_es.es.get_index(
+            idx = elastic.get_index(
                 job_ad["QDate"],
                 template=args.es_index_template,
                 update_es=(args.feed_es and not args.read_only),
             )
             ad_list = buffered_ads.setdefault(idx, [])
-            ad_list.append((unique_doc_id(dict_ad), dict_ad))
+            ad_list.append((convert.unique_doc_id(dict_ad), dict_ad))
 
             if len(ad_list) == args.es_bunch_size:
                 st = time.time()
-                if not args.read_only:
-                    if args.feed_es:
-                        htcondor_es.es.post_ads(
-                            es.handle, idx, ad_list, metadata=metadata
-                        )
+                if not args.read_only and args.feed_es:
+                    elastic.post_ads(es.handle, idx, ad_list, metadata=metadata)
                 logging.debug(
                     "...posting %d ads from %s (process_schedd)",
                     len(ad_list),
@@ -118,14 +101,11 @@ def process_schedd(
             if job_completion > last_completion:
                 last_completion = job_completion
 
-            if time_remaining(starttime) < 0:
-                message = (
-                    "History crawler on %s has been running for "
-                    "more than %d minutes; exiting." % (schedd_ad["Name"], TIMEOUT_MINS)
-                )
+            if utils.time_remaining(start_time) < 0:
+                message = f"History crawler on {schedd_ad['Name']} has been running for more than {utils.TIMEOUT_MINS:d} minutes; exiting."
                 logging.error(message)
-                send_email_alert(
-                    args.email_alerts, "spider_cms history timeout warning", message
+                utils.send_email_alert(
+                    args.email_alerts, "spider history timeout warning", message
                 )
                 timed_out = True
                 break
@@ -140,19 +120,16 @@ def process_schedd(
     except RuntimeError:
         message = "Failed to query schedd for job history: %s" % schedd_ad["Name"]
         exc = traceback.format_exc()
-        message += '\n{}'.format(exc)
+        message += f"\n{exc}"
         logging.error(message)
 
     except Exception as exn:
-        message = "Failure when processing schedd history query on %s: %s" % (
-            schedd_ad["Name"],
-            str(exn),
-        )
+        message = f"Failure when processing schedd history query on {schedd_ad['Name']}: {str(exn)}"
         exc = traceback.format_exc()
-        message += '\n{}'.format(exc)
+        message += f"\n{exc}"
         logging.exception(message)
-        send_email_alert(
-            args.email_alerts, "spider_cms schedd history query error", message
+        utils.send_email_alert(
+            args.email_alerts, "spider schedd history query error", message
         )
 
     # Post the remaining ads
@@ -165,7 +142,7 @@ def process_schedd(
             )
             if not args.read_only:
                 if args.feed_es:
-                    htcondor_es.es.post_ads(es.handle, idx, ad_list, metadata=metadata)
+                    elastic.post_ads(es.handle, idx, ad_list, metadata=metadata)
 
     total_time = (time.time() - my_start) / 60.0
     total_upload /= 60.0
@@ -173,8 +150,7 @@ def process_schedd(
         "%Y-%m-%d %H:%M:%S"
     )
     logging.warning(
-        "Schedd %-25s history: response count: %5d; last completion %s; "
-        "query time %.2f min; upload time %.2f min",
+        "Schedd %-25s history: response count: %5d; last completion %s; query time %.2f min; upload time %.2f min",
         schedd_ad["Name"],
         count,
         last_formatted,
@@ -190,12 +166,18 @@ def process_schedd(
     return last_completion
 
 
-def update_checkpoint(name, completion_date):
+def load_checkpoint():
     try:
         with open("checkpoint.json", "r") as fd:
             checkpoint = json.load(fd)
-    except IOError as ValueError:
+    except IOError:
         checkpoint = {}
+
+    return checkpoint
+
+
+def update_checkpoint(name, completion_date):
+    checkpoint = load_checkpoint()
 
     checkpoint[name] = completion_date
 
@@ -208,10 +190,7 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
     Process history files for each schedd listed in a given
     multiprocessing pool
     """
-    try:
-        checkpoint = json.load(open("checkpoint.json"))
-    except IOError as ValueError:
-        checkpoint = {}
+    checkpoint = load_checkpoint()
 
     futures = []
     metadata = metadata or {}
@@ -240,7 +219,9 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
                 if job is None:  # Swallow poison pill
                     break
             except EOFError as error:
-                logging.warning("EOFError - Nothing to consume left in the queue %s", error)
+                logging.warning(
+                    "EOFError - Nothing to consume left in the queue %s", error
+                )
                 break
             update_checkpoint(*job)
 
@@ -251,17 +232,17 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
     # completion checkpoint in case
     timed_out = False
     for name, future in futures:
-        if time_remaining(starttime) > -10:
+        if utils.time_remaining(starttime) > -10:
             try:
-                future.get(time_remaining(starttime) + 10)
+                future.get(utils.time_remaining(starttime) + 10)
             except multiprocessing.TimeoutError:
                 # This implies that the checkpoint hasn't been updated
                 message = "Schedd %s history timed out; ignoring progress." % name
                 exc = traceback.format_exc()
-                message += '\n{}'.format(exc)
+                message += f"\n{exc}"
                 logging.error(message)
-                send_email_alert(
-                    args.email_alerts, "spider_cms history timeout warning", message
+                utils.send_email_alert(
+                    args.email_alerts, "spider history timeout warning", message
                 )
             except elasticsearch.exceptions.TransportError:
                 message = (
@@ -269,10 +250,10 @@ def process_histories(schedd_ads, starttime, pool, args, metadata=None):
                     % name
                 )
                 exc = traceback.format_exc()
-                message += '\n{}'.format(exc)
+                message += f"\n{exc}"
                 logging.error(message)
-                send_email_alert(
-                    args.email_alerts, "spider_cms history transport error warning", message
+                utils.send_email_alert(
+                    args.email_alerts, "spider history transport error warning", message
                 )
         else:
             timed_out = True

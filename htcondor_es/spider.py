@@ -1,26 +1,15 @@
 #!/usr/bin/env python
 """
-Script for processing the contents of the CMS pool.
+Script for processing the contents of the CHTC pool.
 """
 
-import os
-import sys
 import time
 import signal
 import logging
 import argparse
 import multiprocessing
 
-try:
-    import htcondor_es
-except ImportError:
-    if os.path.exists("src/htcondor_es/__init__.py") and "src" not in sys.path:
-        sys.path.append("src")
-
-import htcondor_es.history
-import htcondor_es.queues
-from htcondor_es.utils import get_schedds, get_schedds_from_file, set_up_logging, send_email_alert
-from htcondor_es.utils import collect_metadata, TIMEOUT_MINS
+from . import history, queues, utils
 
 
 def main_driver(args):
@@ -29,42 +18,41 @@ def main_driver(args):
     """
     starttime = time.time()
 
-    signal.alarm(TIMEOUT_MINS * 60 + 60)
+    signal.alarm(utils.TIMEOUT_MINS * 60 + 60)
 
     # Get all the schedd ads
     schedd_ads = []
     if args.collectors_file:
-        schedd_ads = get_schedds_from_file(args, collectors_file=args.collectors_file)
-        del args.collectors_file #sending a file through postprocessing will cause problems. 
+        schedd_ads = utils.get_schedds_from_file(
+            args, collectors_file=args.collectors_file
+        )
+        # sending a file through postprocessing will cause problems.
+        del args.collectors_file
     else:
-        schedd_ads = get_schedds(args, collectors=args.collectors)
+        schedd_ads = utils.get_schedds(args, collectors=args.collectors)
     logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
 
-    pool = multiprocessing.Pool(processes=args.query_pool_size)
+    with multiprocessing.Pool(processes=args.query_pool_size) as pool:
+        metadata = utils.collect_metadata()
 
-    metadata = collect_metadata()
+        if not args.skip_history:
+            history.process_histories(
+                schedd_ads=schedd_ads,
+                starttime=starttime,
+                pool=pool,
+                args=args,
+                metadata=metadata,
+            )
 
-    if not args.skip_history:
-        htcondor_es.history.process_histories(
-            schedd_ads=schedd_ads,
-            starttime=starttime,
-            pool=pool,
-            args=args,
-            metadata=metadata,
-        )
-
-    # Now that we have the fresh history, process the queues themselves.
-    if args.process_queue:
-        htcondor_es.queues.process_queues(
-            schedd_ads=schedd_ads,
-            starttime=starttime,
-            pool=pool,
-            args=args,
-            metadata=metadata,
-        )
-
-    pool.close()
-    pool.join()
+        # Now that we have the fresh history, process the queues themselves.
+        if args.process_queue:
+            queues.process_queues(
+                schedd_ads=schedd_ads,
+                starttime=starttime,
+                pool=pool,
+                args=args,
+                metadata=metadata,
+            )
 
     logging.warning(
         "@@@ Total processing time: %.2f mins", ((time.time() - starttime) / 60.0)
@@ -75,7 +63,7 @@ def main_driver(args):
 
 def main():
     """
-    Main method for the spider_cms script.
+    Main method for the spider script.
 
     Parses arguments and invokes main_driver
     """
@@ -102,8 +90,7 @@ def main():
         type=str,
         dest="schedd_filter",
         help=(
-            "Comma separated list of schedd names to process "
-            "[default is to process all]"
+            "Comma separated list of schedd names to process [default is to process all]"
         ),
     )
     parser.add_argument(
@@ -123,8 +110,7 @@ def main():
         action="store_true",
         dest="dry_run",
         help=(
-            "Don't even read info, just pretend to. (Still "
-            "query the collector for the schedd's though.)"
+            "Don't even read info, just pretend to. (Still query the collector for the schedd's though.)"
         ),
     )
     parser.add_argument(
@@ -133,8 +119,7 @@ def main():
         type=int,
         dest="max_documents_to_process",
         help=(
-            "Abort after this many documents (per schedd). "
-            "[default: %(default)d (process all)]"
+            "Abort after this many documents (per schedd). [default: %(default)d (process all)]"
         ),
     )
     parser.add_argument(
@@ -148,30 +133,28 @@ def main():
         default=250,
         type=int,
         dest="es_bunch_size",
-        help=("Send docs to ES in bunches of this number " "[default: %(default)d]"),
+        help="Send docs to ES in bunches of this number [default: %(default)d]",
     )
     parser.add_argument(
         "--query_queue_batch_size",
         default=50,
         type=int,
         dest="query_queue_batch_size",
-        help=(
-            "Send docs to listener in batches of this number " "[default: %(default)d]"
-        ),
+        help="Send docs to listener in batches of this number [default: %(default)d]",
     )
     parser.add_argument(
         "--upload_pool_size",
         default=8,
         type=int,
         dest="upload_pool_size",
-        help=("Number of parallel processes for uploading " "[default: %(default)d]"),
+        help="Number of parallel processes for uploading [default: %(default)d]",
     )
     parser.add_argument(
         "--query_pool_size",
         default=8,
         type=int,
         dest="query_pool_size",
-        help=("Number of parallel processes for querying " "[default: %(default)d]"),
+        help="Number of parallel processes for querying [default: %(default)d]",
     )
 
     parser.add_argument(
@@ -179,25 +162,21 @@ def main():
         default="localhost",
         type=str,
         dest="es_hostname",
-        help="Hostname of the elasticsearch instance to be used "
-        "[default: %(default)s]",
+        help="Hostname of the elasticsearch instance to be used [default: %(default)s]",
     )
     parser.add_argument(
         "--es_port",
         default=9200,
         type=int,
         dest="es_port",
-        help="Port of the elasticsearch instance to be used " "[default: %(default)d]",
+        help="Port of the elasticsearch instance to be used [default: %(default)d]",
     )
     parser.add_argument(
         "--es_index_template",
         default="htcondor",
         type=str,
         dest="es_index_template",
-        help=(
-            "Trunk of index pattern. "
-            "[default: %(default)s]"
-        ),
+        help="Trunk of index pattern. [default: %(default)s]",
     )
     parser.add_argument(
         "--log_dir",
@@ -211,7 +190,7 @@ def main():
         default="WARNING",
         type=str,
         dest="log_level",
-        help="Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) " "[default: %(default)s]",
+        help="Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) [default: %(default)s]",
     )
     parser.add_argument(
         "--email_alerts",
@@ -231,12 +210,12 @@ def main():
         "--collectors_file",
         default=None,
         action="store",
-        type=argparse.FileType('r'),
+        type=argparse.FileType("r"),
         dest="collectors_file",
-        help="FIle defining the pools and collectors",
+        help="File defining the pools and collectors",
     )
     args = parser.parse_args()
-    set_up_logging(args)
+    utils.set_up_logging(args)
 
     # --dry_run implies read_only
     args.read_only = args.read_only or args.dry_run

@@ -18,7 +18,7 @@ except ImportError:
         sys.path.append("src")
 
 from htcondor_es.utils import get_schedds
-from htcondor_es.convert_to_json import convert_to_json
+from htcondor_es.convert import to_json
 
 
 def process_pickle(filename, args):
@@ -32,7 +32,7 @@ def process_pickle(filename, args):
         except Exception as e:
             print(e)
 
-        dict_ads = [convert_to_json(job_ad, return_dict=True) for job_ad in job_ads]
+        dict_ads = [to_json(job_ad, return_dict=True) for job_ad in job_ads]
         dict_ads = [_f for _f in dict_ads if _f]
         json.dump(dict_ads, dfile, indent=4, sort_keys=True)
         count = len(dict_ads)

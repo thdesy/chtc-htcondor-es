@@ -4,13 +4,13 @@ import re
 import json
 import time
 import datetime
-import classad
-import datetime
 import logging
-import htcondor
 import socket
+import collections
+
 import elasticsearch
-import htcondor_es.convert_to_json
+
+from . import convert
 
 
 def filter_name(keys):
@@ -24,18 +24,18 @@ def filter_name(keys):
 
 def make_mappings():
     props = {}
-    for name in filter_name(htcondor_es.convert_to_json.int_vals):
+    for name in filter_name(convert.INT_VALS):
         props[name] = {"type": "long"}
-    for name in filter_name(htcondor_es.convert_to_json.string_vals):
-        if name in htcondor_es.convert_to_json.no_idx:
+    for name in filter_name(convert.STRING_VALS):
+        if name in convert.NO_INDEX:
             props[name] = {"type": "text", "index": "false"}
-        elif name in htcondor_es.convert_to_json.no_analysis:
+        elif name in convert.NO_ANALYSIS:
             props[name] = {"type": "keyword"}
         # else:
         #     props[name] = {"type": "keyword"} #, "analyzer": "analyzer_keyword"}
-    for name in filter_name(htcondor_es.convert_to_json.date_vals):
+    for name in filter_name(convert.DATE_VALS):
         props[name] = {"type": "date", "format": "epoch_second"}
-    for name in filter_name(htcondor_es.convert_to_json.bool_vals):
+    for name in filter_name(convert.BOOL_VALS):
         props[name] = {"type": "boolean"}
     props["Args"]["index"] = "false"
     props["Cmd"]["index"] = "false"
@@ -54,10 +54,7 @@ def make_mappings():
         }
     }
 
-    mappings = {
-        "dynamic_templates": [dynamic_string_template], 
-        "properties": props
-    }
+    mappings = {"dynamic_templates": [dynamic_string_template], "properties": props}
     return mappings
 
 
@@ -73,19 +70,19 @@ def make_settings():
     return settings
 
 
-_es_handle = None
+_ES_HANDLE = None
 
 
 def get_server_handle(args=None):
-    global _es_handle
-    if not _es_handle:
+    global _ES_HANDLE
+    if not _ES_HANDLE:
         if not args:
             logging.error(
                 "Call get_server_handle with args first to create ES interface instance"
             )
-            return _es_handle
-        _es_handle = ElasticInterface(hostname=args.es_hostname, port=args.es_port)
-    return _es_handle
+            return _ES_HANDLE
+        _ES_HANDLE = ElasticInterface(hostname=args.es_hostname, port=args.es_port)
+    return _ES_HANDLE
 
 
 class ElasticInterface(object):
@@ -96,7 +93,7 @@ class ElasticInterface(object):
         if domain == "cern.ch":
             passwd = ""
             username = ""
-            regex = re.compile("^([A-Za-z]+):\s(.*)")
+            regex = re.compile(r"^([A-Za-z]+):\s(.*)")
             for line in open("es.conf"):
                 m = regex.match(line)
                 if m:
@@ -133,10 +130,8 @@ class ElasticInterface(object):
             ],
         }
         logging.info(
-            idx_clt.put_mapping(  # pylint: disable = unexpected-keyword-arg
-                index=idx,
-                body=json.dumps({"properties": custom_mappings}),
-                ignore=400,
+            idx_clt.put_mapping(
+                index=idx, body=json.dumps({"properties": custom_mappings}), ignore=400
             )
         )
 
@@ -156,30 +151,30 @@ class ElasticInterface(object):
             index=idx, body=body, ignore=400
         )
         if result.get("status") != 400:
-            logging.warning("Creation of index %s: %s" % (idx, str(result)))
+            logging.warning(f"Creation of index {idx}: {str(result)}")
         elif "already exists" not in result.get("error", "").get("reason", ""):
             logging.error(
-                "Creation of index %s failed: %s" % (idx, str(result.get("error", "")))
+                f'Creation of index {idx} failed: {str(result.get("error", ""))}'
             )
 
 
-_index_cache = set()
+_INDEX_CACHE = set()
 
 
 def get_index(timestamp, template="htcondor", update_es=True):
-    global _index_cache
+    global _INDEX_CACHE
     idx = time.strftime(
         "%s-%%Y-%%m-%%d" % template,
         datetime.datetime.utcfromtimestamp(timestamp).timetuple(),
     )
 
     if update_es:
-        if idx in _index_cache:
+        if idx in _INDEX_CACHE:
             return idx
 
         _es_handle = get_server_handle()
         _es_handle.make_mapping(idx, template=template)
-        _index_cache.add(idx)
+        _INDEX_CACHE.add(idx)
 
     return idx
 
@@ -198,16 +193,13 @@ def make_es_body(ads, metadata=None):
 
 
 def parse_errors(result):
-    from collections import Counter
-
     reasons = [
         d.get("index", {}).get("error", {}).get("reason", None) for d in result["items"]
     ]
-    counts = Counter([_f for _f in reasons if _f])
+    counts = collections.Counter([_f for _f in reasons if _f])
     n_failed = sum(counts.values())
     logging.error(
-        "Failed to index %d documents to ES: %s"
-        % (n_failed, str(counts.most_common(3)))
+        f"Failed to index {n_failed:d} documents to ES: {str(counts.most_common(3))}"
     )
     return n_failed
 
