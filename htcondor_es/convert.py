@@ -61,6 +61,7 @@ STRING_VALS = {
     "GlobusRSL",
     "GridJobId",
     "LastRemoteHost",
+    "LastRemotePool",
     "MATCH_EXP_JOB_GLIDECLIENT_Name",
     "MATCH_EXP_JOB_GLIDEIN_ClusterId",
     "MATCH_EXP_JOB_GLIDEIN_CMSSite",
@@ -377,7 +378,6 @@ IGNORE = {
     "MachineAttrGLIDEIN_CMSSite0",
     "CMS_ALLOW_OVERFLOW",
     "LastPublicClaimId",
-    "LastRemotePool",
     "Used_Gatekeeper",
     "DESIRED_OpSyses",
 }
@@ -404,7 +404,6 @@ NO_INDEX = {
     "MinHosts",
     "StartdIpAddr",
     "StartdPrincipal",
-    "LastRemoteHost",
 }
 
 NO_ANALYSIS = {
