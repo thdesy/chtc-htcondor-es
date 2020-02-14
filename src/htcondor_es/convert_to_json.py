@@ -65,6 +65,7 @@ string_vals = set(
         "GlobusRSL",
         "GridJobId",
         "LastRemoteHost",
+        "LastRemotePool",
         "MATCH_EXP_JOB_GLIDECLIENT_Name",
         "MATCH_EXP_JOB_GLIDEIN_ClusterId",
         "MATCH_EXP_JOB_GLIDEIN_CMSSite",
@@ -370,7 +371,6 @@ ignore = set(
         "MachineAttrGLIDEIN_CMSSite0",
         "CMS_ALLOW_OVERFLOW",
         "LastPublicClaimId",
-        "LastRemotePool",
         "Used_Gatekeeper",
         "DESIRED_OpSyses",
     ]
@@ -399,7 +399,6 @@ no_idx = set(
         "MinHosts",
         "StartdIpAddr",
         "StartdPrincipal",
-        "LastRemoteHost",
     ]
 )
 
