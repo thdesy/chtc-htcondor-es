@@ -10,17 +10,17 @@ import errno
 import shlex
 import socket
 import random
-import logging
 import smtplib
 import subprocess
 import email.mime.text
-import logging.handlers
 import json
+import logging
+import logging.handlers
 
-import classad
 import htcondor
 
 TIMEOUT_MINS = 11
+
 
 def get_schedds_from_file(args=None, collectors_file=None):
     schedds = []
@@ -31,11 +31,10 @@ def get_schedds_from_file(args=None, collectors_file=None):
             _pool_schedds = get_schedds(args, collectors=pools[pool], pool_name=pool)
             schedds.extend([s for s in _pool_schedds if s.get("Name") not in names])
             names.update([s.get("Name") for s in _pool_schedds])
-        
     except (IOError, json.JSONDecodeError):
         schedds = get_schedds(args)
     return schedds
-    
+
 
 def get_schedds(args=None, collectors=None, pool_name="Unknown"):
     """
@@ -74,18 +73,16 @@ def send_email_alert(recipients, subject, message):
     if not recipients:
         return
     msg = email.mime.text.MIMEText(message)
-    msg["Subject"] = "%s - %sh: %s" % (
-        socket.gethostname(),
-        time.strftime("%b %d, %H:%M"),
-        subject,
-    )
+    msg[
+        "Subject"
+    ] = f"{socket.gethostname()} - {time.strftime('%b %d, %H:%M')}h: {subject}"
 
     domain = socket.getfqdn()
     uid = os.geteuid()
     pw_info = pwd.getpwuid(uid)
     if "cern.ch" not in domain:
         domain = "%s.unl.edu" % socket.gethostname()
-    msg["From"] = "%s@%s" % (pw_info.pw_name, domain)
+    msg["From"] = f"{pw_info.pw_name}@{domain}"
     msg["To"] = recipients[0]
 
     try:
@@ -125,7 +122,7 @@ def set_up_logging(args):
         if oserr.errno != errno.EEXIST:
             raise
 
-    log_file = os.path.join(args.log_dir, "spider_cms.log")
+    log_file = os.path.join(args.log_dir, "spider.log")
     filehandler = logging.handlers.RotatingFileHandler(log_file, maxBytes=100000)
     filehandler.setFormatter(
         logging.Formatter("%(asctime)s : %(name)s:%(levelname)s - %(message)s")
