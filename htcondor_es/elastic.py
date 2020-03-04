@@ -24,37 +24,64 @@ def filter_name(keys):
 
 def make_mappings():
     props = {}
-    for name in filter_name(convert.INT_VALS):
+    for name in filter_name(convert.TEXT_ATTRS):
+        props[name] = {"type": "text"}
+    for name in filter_name(convert.INDEXED_KEYWORD_ATTRS):
+        props[name] = {"type": "keyword"}
+    for name in filter_name(convert.NOINDEX_KEYWORD_ATTRS):
+        props[name] = {"type": "keyword", "index": "false"}
+    for name in filter_name(convert.FLOAT_ATTRS):
+        props[name] = {"type": "double"}
+    for name in filter_name(convert.INT_ATTRS):
         props[name] = {"type": "long"}
-    for name in filter_name(convert.STRING_VALS):
-        if name in convert.NO_INDEX:
-            props[name] = {"type": "text", "index": "false"}
-        elif name in convert.NO_ANALYSIS:
-            props[name] = {"type": "keyword"}
-        # else:
-        #     props[name] = {"type": "keyword"} #, "analyzer": "analyzer_keyword"}
-    for name in filter_name(convert.DATE_VALS):
+    for name in filter_name(convert.DATE_ATTRS):
         props[name] = {"type": "date", "format": "epoch_second"}
-    for name in filter_name(convert.BOOL_VALS):
+    for name in filter_name(convert.BOOL_ATTRS):
         props[name] = {"type": "boolean"}
-    props["Args"]["index"] = "false"
-    props["Cmd"]["index"] = "false"
-    props["StartdPrincipal"]["index"] = "false"
-    props["StartdIpAddr"]["index"] = "false"
-    # props["x509UserProxyFQAN"]["analyzer"] = "standard"
-    # props["x509userproxysubject"]["analyzer"] = "standard"
     props["metadata"] = {
         "properties": {"spider_runtime": {"type": "date", "format": "epoch_millis"}}
     }
 
-    dynamic_string_template = {
-        "strings_as_keywords": {
+    dynamic_templates = [
+        {"strings_as_keywords": { # Store unknown strings as keywords
             "match_mapping_type": "string",
-            "mapping": {"type": "keyword", "norms": "false", "ignore_above": 256},
-        }
-    }
+            "mapping": {
+                "type": "keyword",
+                "norms": "false",
+                "ignore_above": 256
+            }
+        }},
+        {"date_attrs": { # Attrs ending in "Date" are usually timestamps
+            "match": "*Date",
+            "mapping": {
+                "type": "date",
+                "format": "epoch_second"
+            }
+        }},
+        {"resource_request_attrs": {  # Attrs starting with "Request" are
+            "match_pattern": "regex", # usually resource numbers
+            "match": "^Request[A-Z].*$",
+            "mapping": {
+                "type": "long",
+            }
+        }},
+        {"target_boolean_attrs": {    # Attrs starting with "Want", "Has", or
+            "match_pattern": "regex", # "Is" are usually boolean checks on the
+            "match": "^(Want|Has|Is)[A-Z].*$", # target machine
+            "mapping": {
+                "type": "boolean"
+            }
+        }}
+        {"raw_expressions": {  # Attrs ending in "_EXPR" are generated during
+            "match": "*_EXPR", # ad conversion for expressions that cannot be
+            "mapping": {       # evaluated.
+                "type": "keyword",
+                "index": "false"
+            }
+        }},
+    ]
 
-    mappings = {"dynamic_templates": [dynamic_string_template], "properties": props}
+    mappings = {"dynamic_templates": dynamic_templates, "properties": props}
     return mappings
 
 

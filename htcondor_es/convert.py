@@ -9,7 +9,19 @@ import base64
 
 import classad
 
-INDEX_TEXT_ATTRS = {
+# TEXT_ATTRS should only contain attrs that we want full text search on,
+# otherwise strings are stored as keywords.
+TEXT_ATTRS = {}
+
+INDEXED_KEYWORD_ATTRS = {
+    "Status",
+    "Universe",
+    "CondorPlatform",
+    "CondorVersion",
+    "ShouldTransferFiles",
+    "WhenToTransferOutput",
+    "TargetType",
+    "MyType",
     "AutoClusterId",
     "AccountingGroup",
     "DockerImage",
@@ -19,8 +31,6 @@ INDEX_TEXT_ATTRS = {
     "LastRemotePool",
     "Owner",
     "RemoteHost",
-    "StartdIpAddr",
-    "StartdPrincipal",
     "User",
     "WMAgent_AgentName",
     "WMAgent_RequestName",
@@ -30,8 +40,6 @@ INDEX_TEXT_ATTRS = {
     "x509UserProxyFQAN",
     "x509userproxysubject",
     "x509UserProxyVOName",
-    "ExitReason",
-    "RemoveReason",
     "DAGNodeName",
     "DAGParentNodeNames",
     "ScheddName",
@@ -55,18 +63,7 @@ INDEX_TEXT_ATTRS = {
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_Slot",
 }
 
-KEYWORD_ATTRS = {
-    "Status",
-    "Universe",
-    "CondorPlatform",
-    "CondorVersion",
-    "ShouldTransferFiles",
-    "WhenToTransferOutput",
-    "TargetType",
-    "MyType",
-}
-
-NOINDEX_TEXT_ATTRS = {
+NOINDEX_KEYWORD_ATTRS = {
     "Cmd",
     "Args",
     "Arguments",
@@ -80,10 +77,14 @@ NOINDEX_TEXT_ATTRS = {
     "TransferOutput",
     "TransferOutputRemaps",
     "SpooledOutputFiles",
+    "ExitReason",
     "LastHoldReason",
     "ReleaseReason",
+    "RemoveReason",
     "LastRejMatchReason",
     "SubmitEventNotes",
+    "StartdIpAddr",
+    "StartdPrincipal",
     "DAGManNodesLog",
     "DAGManNodesMask",
 }
@@ -573,26 +574,37 @@ def bulk_convert_ad_data(ad, result):
 
         if isinstance(value, classad.Value):
             if (value is classad.Value.Error) or (value is classad.Value.Undefined):
-                # Could not evaluate expression
+                # Could not evaluate expression, store raw expression
                 value = str(ad.get(key))
                 key = key + "_EXPR"
             else:
                 value = None
-        elif key in BOOL_ATTRS:
-            value = bool(value)
+        elif (key in TEXT_ATTRS) or (key in INDEXED_KEYWORD_ATTRS) or (key in NOINDEX_KEYWORD_ATTRS):
+            value = str(value)
+        elif key in FLOAT_ATTRS:
+            try:
+                value = float(value)
+            except ValueError:
+                if isinstance(value, str) and value.lower() == "unknown":
+                    value = None
+                else:
+                    logging.warning(
+                        f"Failed to convert key {key} with value {repr(value)} to float"
+                    )
+                    continue
         elif key in INT_ATTRS:
             try:
                 value = int(value)
             except ValueError:
-                if value == "Unknown":
+                if isinstance(value, str) and value.lower() == "unknown":
                     value = None
                 else:
                     logging.warning(
                         f"Failed to convert key {key} with value {repr(value)} to int"
                     )
                     continue
-        elif (key in INDEX_TEXT_ATTRS) or (key in NOINDEX_TEXT_ATTRS) or (key in KEYWORD_ATTRS):
-            value = str(value)
+        elif key in BOOL_ATTRS:
+            value = bool(value)
         elif key in DATE_ATTRS:
             if value == 0 or (isinstance(value, str) and value.lower() == "unknown"):
                 value = None
