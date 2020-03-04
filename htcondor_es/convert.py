@@ -176,7 +176,6 @@ INT_ATTRS = {
 
 DATE_ATTRS = {
     "CompletionDate",
-    "CRAB_TaskCreationDate",
     "EnteredCurrentStatus",
     "JobCurrentStartDate",
     "JobCurrentStartExecutingDate",
@@ -210,9 +209,6 @@ DATE_ATTRS = {
 
 BOOL_ATTRS = {
     "CurrentStatusUnknown",
-    "CRAB_Publish",
-    "CRAB_SaveLogsFlag",
-    "CRAB_TransferOutputs",
     "GlobusResubmit",
     "TransferIn",
     "TransferQueued",
