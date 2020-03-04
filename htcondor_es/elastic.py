@@ -71,7 +71,7 @@ def make_mappings():
             "mapping": {
                 "type": "boolean"
             }
-        }}
+        }},
         {"raw_expressions": {  # Attrs ending in "_EXPR" are generated during
             "match": "*_EXPR", # ad conversion for expressions that cannot be
             "mapping": {       # evaluated.
