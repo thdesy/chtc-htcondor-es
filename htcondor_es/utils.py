@@ -22,25 +22,105 @@ import htcondor
 TIMEOUT_MINS = 11
 
 
-def get_schedds_from_file(args=None, collectors_file=None):
-    schedds = []
-    names = set()
+def default_config():
+    defaults = {
+        'process_schedd_history'   : True,
+        'process_schedd_queue'     : False,
+        'process_max_documents'    : 0,
+        'process_parallel_queries' : 8,
+        'es_host'                  : 'localhost',
+        'es_port'                  : 9200,
+        'es_bunch_size'            : 250,
+        'es_feed_schedd_history'   : False,
+        'es_feed_schedd_queue'     : False,
+        'es_index_name'            : 'htcondor_jobs',
+        'es_index_date_attr'       : 'CompletionDate',
+    }
+    return defaults
+
+
+def load_config(args):
+    defaults = default_config()
+    if (args is None) or (args.config_file is None):
+        return args
+
+    config = configparser.ConfigParser(
+        allow_no_value=True,
+        empty_lines_in_values=False)
     try:
-        pools = json.load(collectors_file)
-        for pool in pools:
-            _pool_schedds = get_schedds(args, collectors=pools[pool], pool_name=pool)
-            schedds.extend([s for s in _pool_schedds if s.get("Name") not in names])
-            names.update([s.get("Name") for s in _pool_schedds])
-    except (IOError, json.JSONDecodeError):
-        schedds = get_schedds(args)
-    return schedds
+        config_files = config.read(args.config_file)
+        if len(config_files) == 0:
+            # Something went wrong with reading the config file,
+            # hopefully open() generates an informative exception.
+            try:
+                open(args.config_file, 'rb').close()
+            except Exception:
+                raise
+            else:
+                # open() didn't error, so something else happened *shrug*
+                raise RuntimeError("Could not read config file. "
+                    "Please check that it exists, is readable, and is free of "
+                    "syntax errors.")
+    except Exception:
+        logging.exception("Fatal error while reading config file")
+        sys.exit(1)
+
+    if (args.collectors is None) and ('COLLECTORS' in config) and (len(list(config['COLLECTORS'])) > 0):
+        args.collectors = ','.join(list(config['COLLECTORS']))
+    if (args.schedds is None) and ('SCHEDDS' in config) and (len(list(config['SCHEDDS'])) > 0):
+        args.schedds = ','.join(list(config['SCHEDDS']))
+    if 'PROCESS' in config:
+        process = config['PROCESS']
+        if (args.process_schedd_history is None):
+            args.process_schedd_history = process.getboolean(
+                'schedd_history', fallback=defaults['process_schedd_history'])
+        if (args.process_schedd_queue is None):
+            args.process_schedd_queue = process.getboolean(
+                'schedd_queue', fallback=defaults['process_schedd_queue'])
+        if (args.process_max_documents is None):
+            args.process_max_documents = process.getint(
+                'max_documents', fallback=defaults['process_max_documents'])
+        if (args.process_parallel_queries is None):
+            args.process_parallel_queries = process.getint(
+                'parallel_queries', fallback=defaults['process_parallel_queries'])
+    if 'ELASTICSEARCH' in config:
+        es = config['ELASTICSEARCH']
+        if (args.es_host is None):
+            args.es_host = es.get('host', fallback=defaults['es_host'])
+        if (args.es_port is None):
+            args.es_port = es.get('port', fallback=defaults['es_port'])
+        if ('es_username' in args and args.es_username is None):
+            args.es_username = es.get('username', fallback=None)
+        if ('es_password' in args and args.es_password is None):
+            args.es_password = es.get('password', fallback=None)
+        if (args.es_bunch_size is None):
+            args.es_bunch_size = es.getint(
+                'bunch_size', fallback=defaults['es_bunch_size'])
+        if (args.es_feed_schedd_history is None):
+            args.es_feed_schedd_history = es.getboolean(
+                'feed_schedd_history', fallback=defaults['es_feed_schedd_history'])
+        if (args.es_feed_schedd_queue is None):
+            args.es_feed_schedd_queue = es.getboolean(
+                'feed_schedd_queue', fallback=defaults['es_feed_schedd_queue'])
+        if (args.es_index_name is None):
+            args.es_index_name = es.get(
+                'index_name', fallback=defaults['es_index_name'])
+        if (args.es_index_date_attr is None):
+            args.es_index_date_attr = es.get(
+                'index_date_attr', fallback=defaults['es_index_date_attr'])
+
+    return args
 
 
-def get_schedds(args=None, collectors=None, pool_name="Unknown"):
+def get_schedds(args=None):
     """
     Return a list of schedd ads representing all the schedds in the pool.
     """
-    collectors = collectors or []
+    collectors = args.collectors
+    if collectors:
+        collectors = collectors.split(',')
+    else:
+        collectors = []
 
     schedd_ads = {}
     for host in collectors:
@@ -52,6 +132,7 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
             continue
 
         for schedd in schedds:
+            schedd["MyPool"] = host
             try:
                 schedd_ads[schedd["Name"]] = schedd
             except KeyError:
@@ -60,8 +141,8 @@ def get_schedds(args=None, collectors=None, pool_name="Unknown"):
     schedd_ads = list(schedd_ads.values())
     random.shuffle(schedd_ads)
 
-    if args and args.schedd_filter:
-        return [s for s in schedd_ads if s["Name"] in args.schedd_filter.split(",")]
+    if args and args.schedds:
+        return [s for s in schedd_ads if s["Name"] in args.schedds.split(",")]
 
     return schedd_ads
 

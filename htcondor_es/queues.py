@@ -142,9 +142,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
         for job_ad in query_iter:
             dict_ad = None
             try:
-                dict_ad = convert.to_json(
-                    job_ad, return_dict=True, reduce_data=not args.keep_full_queue_data
-                )
+                dict_ad = convert.to_json(job_ad, return_dict=True)
             except Exception as e:
                 message = f"Failure when converting document on {schedd_ad['Name']} queue: {e}"
                 logging.warning(message)
@@ -163,7 +161,7 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
             count += 1
             count_since_last_report += 1
 
-            if not args.dry_run and len(batch) == args.query_queue_batch_size:
+            if not args.dry_run and len(batch) == args.es_bunch_size:
                 if utils.time_remaining(starttime) < 10:
                     message = (
                         "Queue crawler on %s has been running for "
@@ -191,10 +189,10 @@ def query_schedd_queue(starttime, schedd_ad, queue, args):
                     )
                     count_since_last_report = 0
 
-            if args.max_documents_to_process and count > args.max_documents_to_process:
+            if args.process_max_documents and count > args.process_max_documents:
                 logging.warning(
-                    "Aborting after %d documents (--max_documents_to_process option)"
-                    % args.max_documents_to_process
+                    "Aborting after %d documents (--process_max_documents option)"
+                    % args.process_max_documents
                 )
                 break
 
@@ -251,7 +249,7 @@ def process_queues(schedd_ads, starttime, pool, args, metadata=None):
     )
     futures = []
 
-    upload_pool = multiprocessing.Pool(processes=args.upload_pool_size)
+    upload_pool = multiprocessing.Pool(processes=args.process_parallel_queries)
 
     for schedd_ad in schedd_ads:
         future = pool.apply_async(
@@ -276,13 +274,13 @@ def process_queues(schedd_ads, starttime, pool, args, metadata=None):
             )
             break
 
-        if args.feed_es_for_queues and not args.read_only:
+        if args.es_feed_schedd_queue and not args.read_only:
             ## Note that these bunches are sized according to --amq_bunch_size
             ## FIXME: Why are we determining the index from one ad?
             idx = htcondor_es.es.get_index(
-                bunch[0][1].get("QDate", int(time.time())),
-                template=args.es_index_template,
-                update_es=(args.feed_es and not args.read_only),
+                bunch[0][1].get(args.es_index_date_attr, int(time.time())),
+                template=args.es_index_name,
+                update_es=(args.es_feed_schedd_queue and not args.read_only),
             )
 
             future = upload_pool.apply_async(
