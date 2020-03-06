@@ -108,11 +108,13 @@ INT_ATTRS = {
     "BytesSent",
     "ClusterId",
     "CommittedSlotTime",
+    "CpusProvisioned",
     "CumulativeSlotTime",
     "CumulativeSuspensionTime",
     "CurrentHosts",
     "DAGManJobId",
     "DelegatedProxyExpiration",
+    "DiskProvisioned",
     "DiskUsage_RAW",
     "ExecutableSize_RAW",
     "ExitStatus",
@@ -130,6 +132,7 @@ INT_ATTRS = {
     "MachineAttrSlotWeight0",
     "MaxHosts",
     "MaxWallTimeMins_RAW",
+    "MemoryProvisioned",
     "MemoryUsage",
     "MinHosts",
     "NumCkpts_RAW",
@@ -250,6 +253,8 @@ IGNORE_ATTRS = {
     "RequestMemory",
     "ResidentSetSize",
     "LastPublicClaimId",
+    "orig_environment",
+    "osg_environment"
 }
 
 # Fields to be kept in docs concerning running jobs
