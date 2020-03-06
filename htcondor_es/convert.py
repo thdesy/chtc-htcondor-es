@@ -9,62 +9,48 @@ import base64
 
 import classad
 
-STRING_VALS = {
+# TEXT_ATTRS should only contain attrs that we want full text search on,
+# otherwise strings are stored as keywords.
+TEXT_ATTRS = {}
+
+INDEXED_KEYWORD_ATTRS = {
+    "Status",
+    "Universe",
+    "CondorPlatform",
+    "CondorVersion",
+    "ShouldTransferFiles",
+    "WhenToTransferOutput",
+    "TargetType",
+    "MyType",
     "AutoClusterId",
-    "AffiliationInstitute",
-    "AffiliationCountry",
-    "Processor",
-    "ChirpCMSSWCPUModels",
-    "CPUModel",
-    "CPUModelName",
-    "ChirpCMSSWCPUModels",
-    "CMSPrimaryPrimaryDataset",
-    "CMSPrimaryProcessedDataset",
-    "CMSPrimaryDataTier",
-    "CMSSWVersion",
-    "CMSSWMajorVersion",
-    "CMSSWReleaseSeries",
-    "CRAB_JobType",
-    "CRAB_JobSW",
-    "CRAB_JobArch",
-    "CRAB_Id",
-    "CRAB_ISB",
-    "CRAB_PostJobStatus",
-    "CRAB_Workflow",
-    "CRAB_UserRole",
-    "CMSGroups",
-    "CRAB_UserHN",
-    "CRAB_UserGroup",
-    "CRAB_TaskWorker",
-    "CRAB_SiteWhitelist",
-    "CRAB_SiteBlacklist",
-    "CRAB_SplitAlgo",
-    "CRAB_PrimaryDataset",
-    "Args",
     "AccountingGroup",
-    "Cmd",
-    "CMS_JobType",
-    "CMS_WMTool",
-    "DESIRED_Archs",
-    "DESIRED_CMSDataLocations",
-    "DESIRED_CMSDataset",
-    "DESIRED_Sites",
-    "ExtDESIRED_Sites",
-    "FormattedCrabId",
+    "DockerImage",
     "GlobalJobId",
+    "GridJobId",
+    "LastRemoteHost",
+    "LastRemotePool",
+    "Owner",
+    "RemoteHost",
+    "User",
+    "WMAgent_AgentName",
+    "WMAgent_RequestName",
+    "WMAgent_SubTaskName",
+    "x509UserProxyEmail",
+    "x509UserProxyFirstFQAN",
+    "x509UserProxyFQAN",
+    "x509userproxysubject",
+    "x509UserProxyVOName",
+    "DAGNodeName",
+    "DAGParentNodeNames",
+    "ScheddName",
     "GlideinClient",
     "GlideinEntryName",
     "GlideinFactory",
     "GlideinFrontendName",
     "GlideinName",
     "GLIDEIN_Entry_Name",
-    "GlobusRSL",
-    "GridJobId",
-    "LastRemoteHost",
-    "LastRemotePool",
     "MATCH_EXP_JOB_GLIDECLIENT_Name",
     "MATCH_EXP_JOB_GLIDEIN_ClusterId",
-    "MATCH_EXP_JOB_GLIDEIN_CMSSite",
     "MATCH_EXP_JOB_GLIDEIN_Entry_Name",
     "MATCH_EXP_JOB_GLIDEIN_Factory",
     "MATCH_EXP_JOB_GLIDEIN_Name",
@@ -75,64 +61,65 @@ STRING_VALS = {
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_JobId",
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_Queue",
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_Slot",
-    "Owner",
-    "Rank",
-    "RemoteHost",
-    "REQUIRED_OS",
-    "ShouldTransferFiles",
-    "StartdIpAddr",
-    "StartdPrincipal",
-    "User",
-    "WhenToTransferOutput",
-    "WMAgent_AgentName",
-    "WMAgent_RequestName",
-    "WMAgent_SubTaskName",
-    "x509UserProxyEmail",
-    "x509UserProxyFirstFQAN",
-    "x509UserProxyFQAN",
-    "x509userproxysubject",
-    "x509UserProxyVOName",
-    "InputData",
-    "Original_DESIRED_Sites",
-    "WMAgent_TaskType",
-    "NordugridRSL",
-    "Campaign",
-    "TaskType",
-    "DataLocations",
-    "Workflow",
-    "Site",
-    "Tier",
-    "Country",
-    "Status",
-    "Universe",
-    "ExitReason",
-    "LastHoldReason",
-    "RemoveReason",
-    "DESIRED_Overflow_Region",
-    "DESIRED_OpSysMajorVers",
-    "DESIRED_CMSDataset",
-    "DAGNodeName",
-    "DAGParentNodeNames",
-    "OverflowType",
-    "ScheddName",
 }
 
-INT_VALS = {
-    "CRAB_Retry",
+NOINDEX_KEYWORD_ATTRS = {
+    "Cmd",
+    "Args",
+    "Arguments",
+    "In",
+    "Out",
+    "Err",
+    "Iwd",
+    "UserLog",
+    "RootDir",
+    "TransferInput",
+    "TransferOutput",
+    "TransferOutputRemaps",
+    "SpooledOutputFiles",
+    "ExitReason",
+    "LastHoldReason",
+    "ReleaseReason",
+    "RemoveReason",
+    "LastRejMatchReason",
+    "SubmitEventNotes",
+    "StartdIpAddr",
+    "StartdPrincipal",
+    "DAGManNodesLog",
+    "DAGManNodesMask",
+}
+
+FLOAT_ATTRS = {
+    "Rank",
+    "CPUsUsage",
+    "QueueHr",
+    "WallClockHr",
+    "CommittedCoreHr",
+    "CoreHr",
+    "CpuTimeHr",
+    "BadputHr",
+    "CpuBadputHr",
+    "MemoryMB",
+    "DiskUsageGB",
+}
+
+INT_ATTRS = {
     "BytesRecvd",
     "BytesSent",
     "ClusterId",
     "CommittedSlotTime",
+    "CpusProvisioned",
     "CumulativeSlotTime",
     "CumulativeSuspensionTime",
     "CurrentHosts",
-    "CRAB_JobCount",
+    "DAGManJobId",
     "DelegatedProxyExpiration",
+    "DiskProvisioned",
     "DiskUsage_RAW",
     "ExecutableSize_RAW",
     "ExitStatus",
-    "GlobusStatus",
     "ImageSize_RAW",
+    "JobLeaseDuration",
     "JobPrio",
     "JobRunCount",
     "JobStatus",
@@ -143,22 +130,18 @@ INT_VALS = {
     "LocalUserCpu",
     "MachineAttrCpus0",
     "MachineAttrSlotWeight0",
-    "MATCH_EXP_JOB_GLIDEIN_Job_Max_Time",
-    "MATCH_EXP_JOB_GLIDEIN_MaxMemMBs",
-    "MATCH_EXP_JOB_GLIDEIN_Max_Walltime",
-    "MATCH_EXP_JOB_GLIDEIN_Memory",
-    "MATCH_EXP_JOB_GLIDEIN_ProcId",
-    "MATCH_EXP_JOB_GLIDEIN_ToDie",
-    "MATCH_EXP_JOB_GLIDEIN_ToRetire",
     "MaxHosts",
     "MaxWallTimeMins_RAW",
+    "MemoryProvisioned",
     "MemoryUsage",
     "MinHosts",
-    "NumGlobusSubmits" "NumJobMatches",
+    "NumCkpts_RAW",
+    "NumJobMatches",
     "NumJobStarts",
     "NumRestarts",
     "NumShadowStarts",
     "NumSystemHolds",
+    "OrigMaxHosts",
     "PilotRestLifeTimeMins",
     "PostJobPrio1",
     "PostJobPrio2",
@@ -167,11 +150,15 @@ INT_VALS = {
     "RecentBlockReads",
     "RecentBlockWriteKbytes",
     "RecentBlockWrites",
+    "RecentStatsLifetimeStarter",
     "RemoteSlotID",
     "RemoteSysCpu",
     "RemoteUserCpu",
     "RemoteWallClockTime",
     "RequestCpus",
+    "RequestDisk",
+    "RequestMemory",
+    "RequestGpus",
     "RequestDisk_RAW",
     "RequestMemory_RAW",
     "ResidentSetSize_RAW",
@@ -180,13 +167,18 @@ INT_VALS = {
     "TransferInputSizeMB",
     "WallClockCheckpoint",
     "WMAgent_JobID",
-    "DesiredSiteCount",
     "DataLocationsCount",
+    "MATCH_EXP_JOB_GLIDEIN_Job_Max_Time",
+    "MATCH_EXP_JOB_GLIDEIN_MaxMemMBs",
+    "MATCH_EXP_JOB_GLIDEIN_Max_Walltime",
+    "MATCH_EXP_JOB_GLIDEIN_Memory",
+    "MATCH_EXP_JOB_GLIDEIN_ProcId",
+    "MATCH_EXP_JOB_GLIDEIN_ToDie",
+    "MATCH_EXP_JOB_GLIDEIN_ToRetire",
 }
 
-DATE_VALS = {
+DATE_ATTRS = {
     "CompletionDate",
-    "CRAB_TaskCreationDate",
     "EnteredCurrentStatus",
     "JobCurrentStartDate",
     "JobCurrentStartExecutingDate",
@@ -216,216 +208,53 @@ DATE_VALS = {
     "GLIDEIN_ToRetire",
     "DataCollectionDate",
     "RecordTime",
-    "ChirpCMSSWLastUpdate",
 }
 
-BOOL_VALS = {
+BOOL_ATTRS = {
     "CurrentStatusUnknown",
-    "CRAB_Publish",
-    "CRAB_SaveLogsFlag",
-    "CRAB_TransferOutputs",
     "GlobusResubmit",
+    "TransferIn",
     "TransferQueued",
     "TransferringInput",
-    "HasSingularity",
     "NiceUser",
     "ExitBySignal",
-    "CMSSWDone",
     "HasBeenRouted",
     "HasBeenOverflowRouted",
     "HasBeenTimingTuned",
+    "OnExitHold",
+    "OnExitRemove",
+    "PeriodicHold",
+    "PeriodicRelease",
+    "PeriodicRemove",
+    "StreamErr",
+    "StreamOut",
+    "UserLogUseXML",
+    "use_x509userproxy",
+    "WantCheckpoint",
+    "WantRemoteIO",
+    "WantRemoteSyscalls",
+    "LeaveJobInQueue",
 }
 
-IGNORE = {
-    "Arguments",
+IGNORE_ATTRS = {
     "CmdHash",
-    "CRAB_UserDN",
-    "CRAB_Destination",
-    "CRAB_DBSURL",
-    "CRAB_ASOURL",
-    "CRAB_ASODB",
-    "CRAB_AdditionalOutputFiles",
-    "CRAB_EDMOutputFiles",
-    "CRAB_TFileOutputFiles",
-    "CRAB_oneEventMode",
-    "CRAB_NumAutomJobRetries",
-    "CRAB_localOutputFiles",
-    "CRAB_ASOTimeout",
-    "CRAB_OutTempLFNDir",
-    "CRAB_PublishDBSURL",
-    "CRAB_PublishGroupName",
-    "CRAB_RestURInoAPI",
-    "CRAB_RestHost",
-    "CRAB_ReqName",
-    "CRAB_RetryOnASOFailures",
-    "CRAB_StageoutPolicy",
-    "SubmitEventNotes",
-    "DAGManNodesMask",
-    "DAGManNodesLog",
-    "DAGManJobId",
-    "accounting_group",
-    "AcctGroup",
-    "AcctGroupUser",
-    "AllowOpportunistic",
-    "AutoClusterAttrs",
-    "BufferBlockSize",
-    "BufferSize",
-    "CondorPlatform",
-    "CondorVersion",
     "DiskUsage",
-    "Err",
     "Environment",
     "EnvDelim",
     "Env",
     "ExecutableSize",
-    "HasPrioCorrection",
     "GlideinCredentialIdentifier",
-    "GlideinLogNr",
     "GlideinSecurityClass",
-    "GlideinSlotsLayout",
-    "GlideinWebBase",
-    "GlideinWorkDir",
     "ImageSize",
-    "In",
-    "Iwd",
-    "JobAdInformationAttrs",
-    "job_ad_information_attrs",
-    "JOB_GLIDECLIENT_Name",
-    "JOB_GLIDEIN_ClusterId",
-    "JOB_GLIDEIN_CMSSite",
-    "JOBGLIDEIN_CMSSite",
-    "JOB_GLIDEIN_Entry_Name",
-    "JOB_GLIDEIN_Factory",
-    "JOB_GLIDEIN_Job_Max_Time",
-    "JOB_GLIDEIN_MaxMemMBs",
-    "JOB_GLIDEIN_Max_Walltime",
-    "JOB_GLIDEIN_Memory",
-    "JOB_GLIDEIN_Name",
-    "JOB_GLIDEIN_ProcId",
-    "JOB_GLIDEIN_Schedd",
-    "JOB_GLIDEIN_SEs",
-    "JOB_GLIDEIN_Site",
-    "JOB_GLIDEIN_SiteWMS",
-    "JOB_GLIDEIN_SiteWMS_JobId",
-    "JOB_GLIDEIN_SiteWMS_Queue",
-    "JOB_GLIDEIN_SiteWMS_Slot",
-    "JOB_GLIDEIN_ToDie",
-    "JOB_GLIDEIN_ToRetire",
-    "JobLeaseDuration",
     "JobNotification",
-    "JOB_Site",
-    "Managed",
-    "MATCH_EXP_JOBGLIDEIN_CMSSite",
-    "MATCH_EXP_JOB_Site",
-    "MATCH_GLIDECLIENT_Name",
-    "MATCH_GLIDEIN_ClusterId",
-    "MATCH_GLIDEIN_CMSSite",
-    "MATCH_GLIDEIN_Entry_Name",
-    "MATCH_GLIDEIN_Factory",
-    "MATCH_GLIDEIN_Job_Max_Time",
-    "MATCH_GLIDEIN_MaxMemMBs",
-    "MATCH_GLIDEIN_Max_Walltime",
-    "MATCH_GLIDEIN_Name",
-    "MATCH_GLIDEIN_ProcId",
-    "MATCH_GLIDEIN_Schedd",
-    "MATCH_GLIDEIN_SEs",
-    "MATCH_GLIDEIN_Site",
-    "MATCH_GLIDEIN_SiteWMS",
-    "MATCH_GLIDEIN_SiteWMS_JobId",
-    "MATCH_GLIDEIN_SiteWMS_Queue",
-    "MATCH_GLIDEIN_SiteWMS_Slot",
-    "MATCH_Memory",
-    "MyType",
-    "NiceUser",
     "NumCkpts",
-    "NumCkpts_RAW",
-    "OnExitHold",
-    "OnExitRemove",
-    "OrigMaxHosts",
-    "Out",
-    "PeriodicHold",
-    "PeriodicRelease",
-    "PeriodicRemove",
-    "Prev_DESIRED_Sites",
     "PublicClaimId",
     "RequestDisk",
     "RequestMemory",
     "ResidentSetSize",
-    "REQUIRES_LOCAL_DATA",
-    "RecentBlockReadKbytes",
-    "RecentBlockReads",
-    "RecentBlockWriteKbytes",
-    "RecentBlockWrites",
-    "RootDir",
-    "ServerTime",
-    "SpooledOutputFiles",
-    "StreamErr",
-    "StreamOut",
-    "TargetType",
-    "TransferIn",
-    "TransferInput",
-    "TransferOutput",
-    "UserLog",
-    "UserLogUseXML",
-    "use_x509userproxy",
-    "x509userproxy",
-    "x509UserProxyExpiration",
-    "WantCheckpoint",
-    "WantRemoteIO",
-    "WantRemoteSyscalls",
-    "BlockReadKbytes",
-    "BlockReads",
-    "BlockWriteKbytes",
-    "BlockWrites",
-    "LocalSysCpu",
-    "LeaveJobInQueue",
-    "LocalUserCpu",
-    "JobMachineAttrs",
-    "LastRejMatchReason",
-    "MachineAttrGLIDEIN_CMSSite0",
-    "CMS_ALLOW_OVERFLOW",
     "LastPublicClaimId",
-    "Used_Gatekeeper",
-    "DESIRED_OpSyses",
-}
-
-NO_INDEX = {
-    "CRAB_OutLFNDir",
-    "Args",
-    "Cmd",
-    "BytesRecvd",
-    "CoreSize",
-    "DelegatedProxyExpiration",
-    "Environment",
-    "RecentBlockReadKbytes",
-    "RecentBlockReads",
-    "RecentBlockWriteKbytes",
-    "RecentBlockWrites",
-    "RecentStatsLifetimeStarter",
-    "CurrentHosts",
-    "MachineAttrCpus0",
-    "MachineAttrSlotWeight0",
-    "LocalSysCpu",
-    "LocalUserCpu",
-    "MaxHosts",
-    "MinHosts",
-    "StartdIpAddr",
-    "StartdPrincipal",
-}
-
-NO_ANALYSIS = {
-    "CRAB_PublishName",
-    "CRAB_PublishGroupName",
-    "CondorPlatform",
-    "CondorVersion",
-    "CurrentHosts",
-    "DESIRED_Archs",
-    "ShouldTransferFiles",
-    "TotalSuspensions",
-    "REQUIRED_OS",
-    "ShouldTransferFiles",
-    "WhenToTransferOutput",
-    "DAGParentNodeNames",
+    "orig_environment",
+    "osg_environment"
 }
 
 # Fields to be kept in docs concerning running jobs
@@ -435,17 +264,6 @@ RUNNING_FIELDS = {
     "AffiliationInstitute",
     "AffiliationCountry",
     "BenchmarkJobDB12",
-    "Campaign",
-    "CMS_JobType",
-    "CMS_JobRetryCount",
-    "CMS_Pool",
-    "CMSGroups",
-    "CMSPrimaryDataTier",
-    "CMSSWKLumis",
-    "CMSSWWallHrs",
-    "CMSSWVersion",
-    "CMSSWMajorVersion",
-    "CMSSWReleaseSeries",
     "CommittedCoreHr",
     "CommittedTime",
     "CoreHr",
@@ -455,25 +273,10 @@ RUNNING_FIELDS = {
     "CpuEventRate",
     "CpuTimeHr",
     "CpuTimePerEvent",
-    "CRAB_AsyncDest",
-    "CRAB_DataBlock",
-    "CRAB_Id",
-    "CRAB_JobCount",
-    "CRAB_PostJobStatus",
-    "CRAB_Retry",
-    "CRAB_TaskCreationDate",
-    "CRAB_UserHN",
-    "CRAB_Workflow",
-    "CRAB_SplitAlgo",
-    "CMS_SubmissionTool",
-    "CMS_WMTool",
-    "DESIRED_CMSDataset",
     "EnteredCurrentStatus",
     "EventRate",
-    "FormattedCrabId",
     "GlobalJobId",
     "GLIDEIN_Entry_Name",
-    "HasSingularity",
     "InputData",
     "InputGB",
     "JobPrio",
@@ -483,7 +286,7 @@ RUNNING_FIELDS = {
     "MegaEvents",
     "MemoryMB",
     "OutputGB",
-    "QueueHrs",
+    "QueueHr",
     "QDate",
     "ReadTimeMins",
     "RecordTime",
@@ -502,9 +305,6 @@ RUNNING_FIELDS = {
     "WMAgent_RequestName",
     "WMAgent_SubTaskName",
     "Workflow",
-    "DESIRED_Sites",
-    "DESIRED_SITES_Diff",
-    "DESIRED_SITES_Orig",
     "EstimatedWallTimeMins",
     "EstimatedWallTimeJobCount",
     "PilotRestLifeTimeMins",
@@ -565,17 +365,8 @@ def make_list_from_string_field(ad, key, split_re=r"[\s,]+\s*", default=None):
 
 CREAM_RE = re.compile(r"CPUNumber = (\d+)")
 NORDUGRID_RE = re.compile(r"\(count=(\d+)\)")
-CAMP_RE = re.compile(r"[A-Za-z0-9_]+_[A-Z0-9]+-([A-Za-z0-9]+)-")
-PREP_RE = re.compile(r"[A-Za-z0-9_]+_([A-Z]+-([A-Za-z0-9]+)-[0-9]+)")
-RVAL_RE = re.compile(r"[A-Za-z0-9]+_(RVCMSSW_[0-9]+_[0-9]+_[0-9]+)")
-PREP_PROMPT_RE = re.compile(r"(PromptReco|Repack|Express)_[A-Za-z0-9]+_([A-Za-z0-9]+)")
 # Executable error messages in WMCore
 WMCORE_EXE_EXMSG_RE = re.compile(r"^Chirp_WMCore_[A-Za-z0-9]+_Exception_Message$")
-# 2016 reRECO; of the form cerminar_Run2016B-v2-JetHT-23Sep2016_8020_160923_164036_4747
-RERECO_RE = re.compile(r"[A-Za-z0-9_]+_Run20[A-Za-z0-9-_]+-([A-Za-z0-9]+)")
-GENERIC_SITE_RE = re.compile(r"^[A-Za-z0-9]+_[A-Za-z0-9]+_(.*)_")
-CMS_SITE_RE = re.compile(r"CMS[A-Za-z]*_(.*)_")
-CMSSW_VERSION = re.compile(r"CMSSW_((\d*)_(\d*)_.*)")
 
 
 def to_json(ad, return_dict=False, reduce_data=False):
@@ -643,21 +434,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
     if "x509UserProxyVOName" in ad:
         result["VO"] = str(ad["x509UserProxyVOName"])
     elif ("GlideinEntryName" in ad) and ("MATCH_EXP_JOBGLIDEIN_ResourceName" not in ad):
-        m = GENERIC_SITE_RE.match(ad["GlideinEntryName"])
-        m2 = CMS_SITE_RE.match(ad["GlideinEntryName"])
-        if m2:
-            result["Site"] = m2.groups()[0]
-            info = result["Site"].split("_", 2)
-            if len(info) == 3:
-                result["Tier"] = info[0]
-                result["Country"] = info[1]
-            else:
-                result["Tier"] = "Unknown"
-                result["Country"] = "Unknown"
-        elif m:
-            result["Site"] = m.groups()[0]
-        else:
-            result["Site"] = "UNKNOWN"
+        result["Site"] = ad["GlideinEntryName"]
     else:
         result["Site"] = ad.get("MATCH_EXP_JOBGLIDEIN_ResourceName", "UNKNOWN")
 
@@ -672,11 +449,11 @@ def to_json(ad, return_dict=False, reduce_data=False):
         )
     result["Status"] = STATUS.get(ad.get("JobStatus"), "Unknown")
     result["Universe"] = UNIVERSE.get(ad.get("JobUniverse"), "Unknown")
-    result["QueueHrs"] = (
+    result["QueueHr"] = (
         ad.get("JobCurrentStartDate", time.time()) - ad["QDate"]
     ) / 3600
-    result["Badput"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0)
-    result["CpuBadput"] = max(result["CoreHr"] - result["CpuTimeHr"], 0)
+    result["BadputHr"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0)
+    result["CpuBadputHr"] = max(result["CoreHr"] - result["CpuTimeHr"], 0)
 
     # Parse new machine statistics.
     try:
@@ -727,10 +504,6 @@ def to_json(ad, return_dict=False, reduce_data=False):
             result["CommittedCoreHr"] * result["BenchmarkJobDB12"]
         )
         result["DB12CpuTimeHr"] = result["CpuTimeHr"] * result["BenchmarkJobDB12"]
-
-    result["HasSingularity"] = classad.ExprTree(
-        "MachineAttrHAS_SINGULARITY0 is true"
-    ).eval(ad)
 
     if "MachineAttrCPUModel0" in ad:
         result["CPUModel"] = str(ad["MachineAttrCPUModel0"])
@@ -793,36 +566,47 @@ def bulk_convert_ad_data(ad, result):
     """
     Given a ClassAd, bulk convert to a python dictionary.
     """
-    _keys = set(ad.keys()) - IGNORE
+    _keys = set(ad.keys()) - IGNORE_ATTRS
     for key in _keys:
-        if key.startswith("HasBeen") and key not in BOOL_VALS:
-            continue
         try:
             value = ad.eval(key)
         except:
             continue
 
         if isinstance(value, classad.Value):
-            if value is classad.Value.Error:
-                continue
+            if (value is classad.Value.Error) or (value is classad.Value.Undefined):
+                # Could not evaluate expression, store raw expression
+                value = str(ad.get(key))
+                key = key + "_EXPR"
             else:
                 value = None
-        elif key in BOOL_VALS:
-            value = bool(value)
-        elif key in INT_VALS:
+        elif (key in TEXT_ATTRS) or (key in INDEXED_KEYWORD_ATTRS) or (key in NOINDEX_KEYWORD_ATTRS):
+            value = str(value)
+        elif key in FLOAT_ATTRS:
+            try:
+                value = float(value)
+            except ValueError:
+                if isinstance(value, str) and value.lower() == "unknown":
+                    value = None
+                else:
+                    logging.warning(
+                        f"Failed to convert key {key} with value {repr(value)} to float"
+                    )
+                    continue
+        elif key in INT_ATTRS:
             try:
                 value = int(value)
             except ValueError:
-                if value == "Unknown":
+                if isinstance(value, str) and value.lower() == "unknown":
                     value = None
                 else:
                     logging.warning(
                         f"Failed to convert key {key} with value {repr(value)} to int"
                     )
                     continue
-        elif key in STRING_VALS:
-            value = str(value)
-        elif key in DATE_VALS:
+        elif key in BOOL_ATTRS:
+            value = bool(value)
+        elif key in DATE_ATTRS:
             if value == 0 or (isinstance(value, str) and value.lower() == "unknown"):
                 value = None
             else:
@@ -835,8 +619,6 @@ def bulk_convert_ad_data(ad, result):
                     )
                     value = None
 
-        # elif key in date_vals:
-        #    value = datetime.datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
         if key.startswith("MATCH_EXP_JOB_"):
             key = key[len("MATCH_EXP_JOB_") :]
         if key.endswith("_RAW"):
@@ -855,7 +637,7 @@ def decode_and_decompress(value):
 
 
 def convert_dates_to_millisecs(record):
-    for date_field in DATE_VALS:
+    for date_field in DATE_ATTRS:
         try:
             record[date_field] *= 1000
         except (KeyError, TypeError):
