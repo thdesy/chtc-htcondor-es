@@ -157,7 +157,7 @@ def main():
         const=True,
         dest="es_feed_schedd_queue",
         help=(
-            "Feed Schedd queue to Elasticsearch ",
+            "Feed Schedd queue to Elasticsearch "
             f"[default: {defaults['es_feed_schedd_queue']}]"
         )
     )
@@ -185,7 +185,7 @@ def main():
         dest="log_dir",
         help=(
             "Directory for logging information "
-            "[default: log/]"
+            "[default: %(default)s]"
         ),
     )
     parser.add_argument(
@@ -195,7 +195,7 @@ def main():
         dest="log_level",
         help=(
             "Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) "
-            "[default: WARNING]"
+            "[default: %(default)s]"
         ),
     )
     parser.add_argument(
