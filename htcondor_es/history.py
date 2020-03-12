@@ -96,7 +96,7 @@ def process_schedd(
                 continue
 
             idx = elastic.get_index(
-                index_time(args.es_index_date_attr, ad),
+                index_time(args.es_index_date_attr, job_ad),
                 template=args.es_index_name,
                 update_es=(args.es_feed_schedd_history and not args.read_only),
             )
