@@ -416,11 +416,14 @@ def to_json(ad, return_dict=False, reduce_data=False):
         ad["RequestCpus"] = 1.0
     result["RequestCpus"] = ad["RequestCpus"]
 
+    slot_cpus = ad["RequestCpus"]
+    if "CpusProvisioned" in ad and not isinstance(ad.eval("CpusProvisioned"), classad.Value):
+        slot_cpus = int(ad.eval("CpusProvisioned"))
     result["CoreHr"] = (
-        ad.get("RequestCpus", 1.0) * int(ad.get("RemoteWallClockTime", 0)) / 3600
+        slot_cpus * int(ad.get("RemoteWallClockTime", 0)) / 3600
     )
     result["CommittedCoreHr"] = (
-        ad.get("RequestCpus", 1.0) * ad.get("CommittedTime", 0) / 3600
+        slot_cpus * ad.get("CommittedTime", 0) / 3600
     )
     result["CommittedWallClockHr"] = ad.get("CommittedTime", 0) / 3600
     result["CpuTimeHr"] = (
@@ -430,11 +433,14 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
     try:
         if int(ad.eval("RequestGpus")) > 0:
+            slot_gpus = int(ad.eval("RequestGpus"))
+            if "GpusProvisioned" in ad and not isinstance(ad.eval("GpusProvisioned"), classad.Value):
+                slot_gpus = int(ad.eval("GpusProvisioned"))
             result["GpuCoreHr"] = (
-                int(ad.eval("RequestGpus")) * int(ad.get("RemoteWallClockTime", 0)) / 3600
+                slot_gpus * int(ad.get("RemoteWallClockTime", 0)) / 3600
             )
             result["CommittedGpuCoreHr"] = (
-                int(ad.eval("RequestGpus")) * ad.get("CommittedTime", 0) / 3600
+                slot_gpus * ad.get("CommittedTime", 0) / 3600
             )
     except (ValueError, KeyError, TypeError):
         pass
@@ -455,7 +461,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
             100
             * result["CpuTimeHr"]
             / result["WallClockHr"]
-            / ad.get("RequestCpus", 1.0)
+            / slot_cpus
         )
     result["Status"] = STATUS.get(ad.get("JobStatus"), "Unknown")
     result["Universe"] = UNIVERSE.get(ad.get("JobUniverse"), "Unknown")
