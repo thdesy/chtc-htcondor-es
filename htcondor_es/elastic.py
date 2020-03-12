@@ -109,7 +109,8 @@ def get_server_handle(args=None):
                 "Call get_server_handle with args first to create ES interface instance"
             )
             return _ES_HANDLE
-        _ES_HANDLE = ElasticInterface(hostname=args.es_host, port=args.es_port)
+        _ES_HANDLE = ElasticInterface(hostname=args.es_host, port=args.es_port,
+          username=args.es_username, password=args.es_password, use_https=args.es_use_https)
     return _ES_HANDLE
 
 
