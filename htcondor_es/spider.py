@@ -185,7 +185,7 @@ def main():
         dest="log_dir",
         help=(
             "Directory for logging information "
-            "[default: %(default)s]"
+            "[default: log/]"
         ),
     )
     parser.add_argument(
@@ -195,7 +195,7 @@ def main():
         dest="log_level",
         help=(
             "Log level (CRITICAL/ERROR/WARNING/INFO/DEBUG) "
-            "[default: %(default)s]"
+            "[default: WARNING]"
         ),
     )
     parser.add_argument(
