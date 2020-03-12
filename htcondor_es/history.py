@@ -26,13 +26,16 @@ def index_time(index_attr, ad):
         - else QDate if present
         - else fall back to launch time
     """
-    if ad.get(index_attr, 0) > 0:
-        return ad[args.es_index_attr]
-    
-    elif ad.get("EnteredCurrentStatus", 0) > 0:
+    try:
+        if int(ad.get(index_attr, 0)) > 0:
+            return ad[index_attr]
+    except (ValueError, TypeError):
+        logging.error(f"The value of {index_attr} is not numeric and cannot be used as a timestamp, falling back to EnteredCurrentStatus")
+
+    if ad.get("EnteredCurrentStatus", 0) > 0:
         return ad["EnteredCurrentStatus"]
 
-    elif ad.get("QDate", 0) > 0:
+    if ad.get("QDate", 0) > 0:
         return ad["QDate"]
 
     return _LAUNCH_TIME
