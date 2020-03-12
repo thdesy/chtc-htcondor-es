@@ -22,7 +22,7 @@ def main_driver(args):
 
     # Get all the schedd ads
     schedd_ads = []
-    schedd_ads = get_schedds(args)
+    schedd_ads = utils.get_schedds(args)
     logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
 
     with multiprocessing.Pool(processes=args.process_parallel_queries) as pool:
@@ -60,7 +60,7 @@ def main():
 
     Parses arguments and invokes main_driver
     """
-    defaults = default_config()
+    defaults = utils.default_config()
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config_file",
@@ -225,7 +225,7 @@ def main():
     )
 
     args = parser.parse_args()
-    args = load_config(args)
+    args = utils.load_config(args)
     utils.set_up_logging(args)
 
     # --dry_run implies read_only
