@@ -73,8 +73,12 @@ def process_schedd(
 
                 continue
 
+            # Index based on timestamp attr in config, otherwise fallback to
+            # EnteredCurrentStatus, QDate, then finally current time
             idx = elastic.get_index(
-                job_ad.get(args.es_index_date_attr, int(time.time())),
+                job_ad.get(args.es_index_date_attr,
+                               job_ad.get("EnteredCurrentStatus",
+                                              job_ad.get("QDate", int(time.time())))),
                 template=args.es_index_name,
                 update_es=(args.es_feed_schedd_history and not args.read_only),
             )
