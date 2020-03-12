@@ -166,7 +166,7 @@ def main():
         dest="es_index_name",
         help=(
             "Trunk of Elasticsearch index name "
-            f"[default: {es_index_name}]"
+            f"[default: {defaults['es_index_name']}]"
         ),
     )
     parser.add_argument(
@@ -174,7 +174,7 @@ def main():
         dest="es_index_date_attr",
         help=(
             "Job attribute to use as date for Elasticsearch index name "
-            "[default: {defaults['es_index_date_attr'}]"
+            "[default: {defaults['es_index_date_attr']}]"
         ),
     )
 
