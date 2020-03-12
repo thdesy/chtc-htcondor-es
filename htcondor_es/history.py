@@ -15,6 +15,31 @@ import elasticsearch
 
 from . import elastic, utils, convert
 
+_LAUNCH_TIME = int(time.time())
+
+
+def index_time(index_attr, ad):
+    """
+    Returns
+        - user-preferred timestamp attr if present
+        - else EnteredCurrentStatus if present
+        - else QDate if present
+        - else fall back to launch time
+    """
+    try:
+        if int(ad.get(index_attr, 0)) > 0:
+            return ad[index_attr]
+    except (ValueError, TypeError):
+        logging.error(f"The value of {index_attr} is not numeric and cannot be used as a timestamp, falling back to EnteredCurrentStatus")
+
+    if ad.get("EnteredCurrentStatus", 0) > 0:
+        return ad["EnteredCurrentStatus"]
+
+    if ad.get("QDate", 0) > 0:
+        return ad["QDate"]
+
+    return _LAUNCH_TIME
+
 
 def process_schedd(
     start_time, last_completion, checkpoint_queue, schedd_ad, args, metadata=None
@@ -47,7 +72,7 @@ def process_schedd(
     total_upload = 0
     sent_warnings = False
     timed_out = False
-    if not args.read_only and args.feed_es:
+    if not args.read_only and args.es_feed_schedd_history:
         es = elastic.get_server_handle(args)
     try:
         if not args.dry_run:
@@ -74,16 +99,16 @@ def process_schedd(
                 continue
 
             idx = elastic.get_index(
-                job_ad["QDate"],
-                template=args.es_index_template,
-                update_es=(args.feed_es and not args.read_only),
+                index_time(args.es_index_date_attr, job_ad),
+                template=args.es_index_name,
+                update_es=(args.es_feed_schedd_history and not args.read_only),
             )
             ad_list = buffered_ads.setdefault(idx, [])
             ad_list.append((convert.unique_doc_id(dict_ad), dict_ad))
 
             if len(ad_list) == args.es_bunch_size:
                 st = time.time()
-                if not args.read_only and args.feed_es:
+                if not args.read_only and args.es_feed_schedd_history:
                     elastic.post_ads(es.handle, idx, ad_list, metadata=metadata)
                 logging.debug(
                     "...posting %d ads from %s (process_schedd)",
@@ -110,10 +135,10 @@ def process_schedd(
                 timed_out = True
                 break
 
-            if args.max_documents_to_process and count > args.max_documents_to_process:
+            if args.process_max_documents and count > args.process_max_documents:
                 logging.warning(
-                    "Aborting after %d documents (--max_documents_to_process option)"
-                    % args.max_documents_to_process
+                    "Aborting after %d documents (--process_max_documents option)"
+                    % args.process_max_documents
                 )
                 break
 
@@ -141,7 +166,7 @@ def process_schedd(
                 schedd_ad["Name"],
             )
             if not args.read_only:
-                if args.feed_es:
+                if args.es_feed_schedd_history:
                     elastic.post_ads(es.handle, idx, ad_list, metadata=metadata)
 
     total_time = (time.time() - my_start) / 60.0
