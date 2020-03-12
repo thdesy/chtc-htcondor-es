@@ -428,6 +428,16 @@ def to_json(ad, return_dict=False, reduce_data=False):
     ) / 3600.0
     result["DiskUsageGB"] = ad.get("DiskUsage_RAW", 0) / 1000000
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
+    try:
+        if int(ad.eval("RequestGpus")) > 0:
+            result["GpuCoreHr"] = (
+                int(ad.eval("RequestGpus")) * int(ad.get("RemoteWallClockTime", 0)) / 3600
+            )
+            result["CommittedGpuCoreHr"] = (
+                int(ad.eval("RequestGpus")) * ad.get("CommittedTime", 0) / 3600
+            )
+    except (ValueError, KeyError, TypeError):
+        pass
 
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
