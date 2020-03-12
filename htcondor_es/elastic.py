@@ -9,6 +9,7 @@ import socket
 import collections
 
 import elasticsearch
+import importlib.util
 
 from . import convert
 
@@ -115,34 +116,30 @@ def get_server_handle(args=None):
 class ElasticInterface(object):
     """Interface to elasticsearch"""
 
-    def __init__(self, hostname="localhost", port=9200):
-        domain = socket.getfqdn().split(".", 1)[-1]
-        if domain == "cern.ch":
-            passwd = ""
-            username = ""
-            regex = re.compile(r"^([A-Za-z]+):\s(.*)")
-            for line in open("es.conf"):
-                m = regex.match(line)
-                if m:
-                    key, val = m.groups()
-                    if key == "User":
-                        username = val
-                    elif key == "Pass":
-                        passwd = val
-            self.handle = elasticsearch.Elasticsearch(
-                [
-                    {
-                        "host": hostname,
-                        "port": port,
-                        "http_auth": username + ":" + passwd,
-                    }
-                ],
-                verify_certs=True,
-                use_ssl=True,
-                ca_certs="/etc/pki/tls/certs/ca-bundle.trust.crt",
-            )
+    def __init__(self, hostname="localhost", port=9200, username=None, password=None, use_https=False):
+
+        es_client = {
+            'host': hostname,
+            'port': port,
+        }
+
+        if (username is None) and (password is None):
+            # connect anonymously
+            pass
+        elif (username is None) != (password is None):
+            logger.warning('Only one of username and password have been defined, attempting anonymous connection to Elasticsearch')
         else:
-            self.handle = elasticsearch.Elasticsearch()
+            es_client['http_auth'] = (username, password)
+
+        if use_https:
+            if importlib.util.find_spec('certifi') is None:
+                logger.error('"certifi" library not found, cannot use HTTPS to connect to Elasticsearch')
+                sys.exit(1)
+            else:
+                es_client['use_ssl'] = True
+                es_client['verify_certs'] = True
+
+        self.handle = elasticsearch.Elasticsearch([es_client])
 
     def fix_mapping(self, idx, template="htcondor"):
         idx_clt = elasticsearch.client.IndicesClient(self.handle)

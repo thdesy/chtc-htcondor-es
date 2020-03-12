@@ -16,6 +16,7 @@ import email.mime.text
 import json
 import logging
 import logging.handlers
+from argparse import Namespace
 
 import htcondor
 
@@ -65,50 +66,56 @@ def load_config(args):
         logging.exception("Fatal error while reading config file")
         sys.exit(1)
 
-    if (args.collectors is None) and ('COLLECTORS' in config) and (len(list(config['COLLECTORS'])) > 0):
-        args.collectors = ','.join(list(config['COLLECTORS']))
-    if (args.schedds is None) and ('SCHEDDS' in config) and (len(list(config['SCHEDDS'])) > 0):
-        args.schedds = ','.join(list(config['SCHEDDS']))
+    # convert args from a namespace object to a dict
+    args = vars(args)
+    if (args.get('collectors') is None) and ('COLLECTORS' in config) and (len(list(config['COLLECTORS'])) > 0):
+        args['collectors'] = ','.join(list(config['COLLECTORS']))
+    if (args.get('schedds') is None)    and ('SCHEDDS' in config)    and (len(list(config['SCHEDDS'])) > 0):
+        args['schedds']    = ','.join(list(config['SCHEDDS']))
     if 'PROCESS' in config:
         process = config['PROCESS']
-        if (args.process_schedd_history is None):
-            args.process_schedd_history = process.getboolean(
+        if args.get('process_schedd_history') is None:
+            args['process_schedd_history'] = process.getboolean(
                 'schedd_history', fallback=defaults['process_schedd_history'])
-        if (args.process_schedd_queue is None):
-            args.process_schedd_queue = process.getboolean(
+        if args.get('process_schedd_queue') is None:
+            args['process_schedd_queue'] = process.getboolean(
                 'schedd_queue', fallback=defaults['process_schedd_queue'])
-        if (args.process_max_documents is None):
-            args.process_max_documents = process.getint(
+        if args.get('process_max_documents') is None:
+            args['process_max_documents'] = process.getint(
                 'max_documents', fallback=defaults['process_max_documents'])
-        if (args.process_parallel_queries is None):
-            args.process_parallel_queries = process.getint(
+        if args.get('process_parallel_queries') is None:
+            args['process_parallel_queries'] = process.getint(
                 'parallel_queries', fallback=defaults['process_parallel_queries'])
     if 'ELASTICSEARCH' in config:
         es = config['ELASTICSEARCH']
-        if (args.es_host is None):
-            args.es_host = es.get('host', fallback=defaults['es_host'])
-        if (args.es_port is None):
-            args.es_port = es.get('port', fallback=defaults['es_port'])
-        if ('es_username' in args and args.es_username is None):
-            args.es_username = es.get('username', fallback=None)
-        if ('es_password' in args and args.es_password is None):
-            args.es_password = es.get('password', fallback=None)
-        if (args.es_bunch_size is None):
-            args.es_bunch_size = es.getint(
+        if args.get('es_host') is None:
+            args['es_host'] = es.get('host', fallback=defaults['es_host'])
+        if args.get('es_port') is None:
+            args['es_port'] = es.get('port', fallback=defaults['es_port'])
+        if args.get('es_username') is None:
+            args['es_username'] = es.get('username', fallback=None)
+        if args.get('es_password') is None:
+            args['es_password'] = es.get('password', fallback=None)
+        if args.get('es_use_https') is None:
+            args['es_use_https'] = es.getboolean('use_https', fallback=False)
+        if args.get('es_bunch_size') is None:
+            args['es_bunch_size'] = es.getint(
                 'bunch_size', fallback=defaults['es_bunch_size'])
-        if (args.es_feed_schedd_history is None):
-            args.es_feed_schedd_history = es.getboolean(
+        if args.get('es_feed_schedd_history') is None:
+            args['es_feed_schedd_history'] = es.getboolean(
                 'feed_schedd_history', fallback=defaults['es_feed_schedd_history'])
-        if (args.es_feed_schedd_queue is None):
-            args.es_feed_schedd_queue = es.getboolean(
+        if args.get('es_feed_schedd_queue') is None:
+            args['es_feed_schedd_queue'] = es.getboolean(
                 'feed_schedd_queue', fallback=defaults['es_feed_schedd_queue'])
-        if (args.es_index_name is None):
-            args.es_index_name = es.get(
+        if args.get('es_index_name') is None:
+            args['es_index_name'] = es.get(
                 'index_name', fallback=defaults['es_index_name'])
-        if (args.es_index_date_attr is None):
-            args.es_index_date_attr = es.get(
+        if args.get('es_index_date_attr') is None:
+            args['es_index_date_attr'] = es.get(
                 'index_date_attr', fallback=defaults['es_index_date_attr'])
 
+    # convert args back to a namespace object
+    args = Namespace(**args)
     return args
 
 
