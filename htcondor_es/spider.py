@@ -103,7 +103,7 @@ def main():
         dest="process_max_documents",
         help=(
             "Abort after this many documents (per Schedd). "
-            f"[default: {defaults['process_max_documents'] (process all)]"
+            f"[default: {defaults['process_max_documents']} (process all)]"
         ),
     )
     parser.add_argument(
