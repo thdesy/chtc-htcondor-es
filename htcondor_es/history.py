@@ -15,6 +15,28 @@ import elasticsearch
 
 from . import elastic, utils, convert
 
+_LAUNCH_TIME = int(time.time())
+
+
+def index_time(index_attr, ad):
+    """
+    Returns
+        - user-preferred timestamp attr if present
+        - else EnteredCurrentStatus if present
+        - else QDate if present
+        - else fall back to launch time
+    """
+    if ad.get(index_attr, 0) > 0:
+        return ad[args.es_index_attr]
+    
+    elif ad.get("EnteredCurrentStatus", 0) > 0:
+        return ad["EnteredCurrentStatus"]
+
+    elif ad.get("QDate", 0) > 0:
+        return ad["QDate"]
+
+    return _LAUNCH_TIME
+
 
 def process_schedd(
     start_time, last_completion, checkpoint_queue, schedd_ad, args, metadata=None
@@ -73,12 +95,8 @@ def process_schedd(
 
                 continue
 
-            # Index based on timestamp attr in config, otherwise fallback to
-            # EnteredCurrentStatus, QDate, then finally current time
             idx = elastic.get_index(
-                job_ad.get(args.es_index_date_attr,
-                               job_ad.get("EnteredCurrentStatus",
-                                              job_ad.get("QDate", int(time.time())))),
+                index_time(args.es_index_date_attr, ad),
                 template=args.es_index_name,
                 update_es=(args.es_feed_schedd_history and not args.read_only),
             )
