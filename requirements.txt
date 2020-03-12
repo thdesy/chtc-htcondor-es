@@ -1,4 +1,4 @@
 htcondor
 elasticsearch
 requests
-certifi[https]
+certifi
