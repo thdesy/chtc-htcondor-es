@@ -115,9 +115,13 @@ INT_ATTRS = {
     "DAGManJobId",
     "DelegatedProxyExpiration",
     "DiskProvisioned",
+    "DiskUsage",
     "DiskUsage_RAW",
+    "ExecutableSize",
     "ExecutableSize_RAW",
     "ExitStatus",
+    "GpusProvisioned",
+    "ImageSize",
     "ImageSize_RAW",
     "JobLeaseDuration",
     "JobPrio",
@@ -131,10 +135,12 @@ INT_ATTRS = {
     "MachineAttrCpus0",
     "MachineAttrSlotWeight0",
     "MaxHosts",
+    "MaxWallTimeMins",
     "MaxWallTimeMins_RAW",
     "MemoryProvisioned",
     "MemoryUsage",
     "MinHosts",
+    "NumCkpts",
     "NumCkpts_RAW",
     "NumJobMatches",
     "NumJobStarts",
@@ -156,11 +162,12 @@ INT_ATTRS = {
     "RemoteUserCpu",
     "RemoteWallClockTime",
     "RequestCpus",
-    "RequestDisk",
-    "RequestMemory",
     "RequestGpus",
+    "RequestDisk",
     "RequestDisk_RAW",
+    "RequestMemory",
     "RequestMemory_RAW",
+    "ResidentSetSize",
     "ResidentSetSize_RAW",
     "StatsLifetimeStarter",
     "TotalSuspensions",
@@ -194,6 +201,7 @@ DATE_ATTRS = {
     "TransferOutStarted",
     "LastMatchTime",
     "LastSuspensionTime",
+    "LastVacateTime",
     "LastVacateTime_RAW",
     "MATCH_GLIDEIN_ToDie",
     "MATCH_GLIDEIN_ToRetire",
@@ -238,20 +246,14 @@ BOOL_ATTRS = {
 
 IGNORE_ATTRS = {
     "CmdHash",
-    "DiskUsage",
     "Environment",
     "EnvDelim",
     "Env",
     "ExecutableSize",
     "GlideinCredentialIdentifier",
     "GlideinSecurityClass",
-    "ImageSize",
     "JobNotification",
-    "NumCkpts",
     "PublicClaimId",
-    "RequestDisk",
-    "RequestMemory",
-    "ResidentSetSize",
     "LastPublicClaimId",
     "orig_environment",
     "osg_environment"
@@ -355,6 +357,12 @@ POSTJOB_STATUS_DECODE = {
 _LAUNCH_TIME = int(time.time())
 
 
+def ad_pop(ad, key):
+    v = ad[key]
+    del ad[key]
+    return v
+
+
 def make_list_from_string_field(ad, key, split_re=r"[\s,]+\s*", default=None):
     default = default or ["UNKNOWN"]
     try:
@@ -380,6 +388,12 @@ def to_json(ad, return_dict=False, reduce_data=False):
 
     result["ScheddName"] = ad.get("GlobalJobId", "UNKNOWN").split("#")[0]
 
+    # Enforce camel case names for GPU attrs
+    if "RequestGpus" in ad:
+        ad["RequestGpus"] = ad_pop(ad, "RequestGpus")
+    if "GpusProvisioned" in ad:
+        ad["GpusProvisioned"] = ad_pop(ad, "GpusProvisioned")
+
     bulk_convert_ad_data(ad, result)
 
     # Classify failed jobs
@@ -394,6 +408,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
         ad["CommittedTime"] = ad["RemoteWallClockTime"]
     result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600
 
+    slot_cpus = []
     if "RequestCpus" not in ad:
         m = CREAM_RE.search(ad.get("CreamAttributes", ""))
         m2 = NORDUGRID_RE.search(ad.get("NordugridRSL"))
@@ -409,35 +424,48 @@ def to_json(ad, return_dict=False, reduce_data=False):
                 pass
         elif "xcount" in ad:
             ad["RequestCpus"] = ad["xcount"]
-    ad.setdefault("RequestCpus", 1)
-    try:
-        ad["RequestCpus"] = int(ad.eval("RequestCpus"))
-    except ValueError:
-        ad["RequestCpus"] = 1.0
-    result["RequestCpus"] = ad["RequestCpus"]
-
+    elif not isinstance(ad.eval("RequestCpus"), classad.Value):
+        slot_cpus.append(int(ad.eval("RequestCpus")))
+    if "CpusProvisioned" in ad and not isinstance(ad.eval("CpusProvisioned"), classad.Value):
+        slot_cpus.append(int(ad.eval("CpusProvisioned")))
+    if len(slot_cpus) > 0:
+        slot_cpus = max(min(slot_cpus), 1) # assume used CPUs is minimum of requested or provided
+    else:
+        slot_cpus = 1 # assume job had to use at least one CPU
     result["CoreHr"] = (
-        ad.get("RequestCpus", 1.0) * int(ad.get("RemoteWallClockTime", 0)) / 3600
+        slot_cpus * int(ad.get("RemoteWallClockTime", 0)) / 3600
     )
     result["CommittedCoreHr"] = (
-        ad.get("RequestCpus", 1.0) * ad.get("CommittedTime", 0) / 3600
+        slot_cpus * ad.get("CommittedTime", 0) / 3600
     )
     result["CommittedWallClockHr"] = ad.get("CommittedTime", 0) / 3600
     result["CpuTimeHr"] = (
         ad.get("RemoteSysCpu", 0) + ad.get("RemoteUserCpu", 0)
     ) / 3600.0
+
     result["DiskUsageGB"] = ad.get("DiskUsage_RAW", 0) / 1000000
+
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
-    try:
-        if int(ad.eval("RequestGpus")) > 0:
-            result["GpuCoreHr"] = (
-                int(ad.eval("RequestGpus")) * int(ad.get("RemoteWallClockTime", 0)) / 3600
-            )
-            result["CommittedGpuCoreHr"] = (
-                int(ad.eval("RequestGpus")) * ad.get("CommittedTime", 0) / 3600
-            )
-    except (ValueError, KeyError, TypeError):
-        pass
+
+    slot_gpus = []
+    if "RequestGpus" in ad:
+        if not isinstance(ad.eval("RequestGpus"), classad.Value):
+            slot_gpus.append(int(ad.eval("RequestGpus")))
+    if "GpusProvisioned" in ad:
+        if (
+                not isinstance(ad.eval("GpusProvisioned"), classad.Value) and
+                not (len(slot_gpus) == 1 and slot_gpus[0] == 0)
+            ):
+            slot_gpus.append(int(ad.eval("GpusProvisioned")))
+    # only compute GPU stats if at least one GPU was requested
+    if "RequestGpus" in ad and len(slot_gpus) > 0 and slot_gpus[0] != 0:
+        slot_gpus = min(slot_gpus) # assume used GPUs is minimum of request or provided
+        result["GpuCoreHr"] = (
+            slot_gpus * int(ad.get("RemoteWallClockTime", 0)) / 3600
+        )
+        result["CommittedGpuCoreHr"] = (
+            slot_gpus * ad.get("CommittedTime", 0) / 3600
+        )
 
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
@@ -455,7 +483,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
             100
             * result["CpuTimeHr"]
             / result["WallClockHr"]
-            / ad.get("RequestCpus", 1.0)
+            / slot_cpus
         )
     result["Status"] = STATUS.get(ad.get("JobStatus"), "Unknown")
     result["Universe"] = UNIVERSE.get(ad.get("JobUniverse"), "Unknown")
@@ -629,10 +657,6 @@ def bulk_convert_ad_data(ad, result):
                     )
                     value = None
 
-        if key.startswith("MATCH_EXP_JOB_"):
-            key = key[len("MATCH_EXP_JOB_") :]
-        if key.endswith("_RAW"):
-            key = key[: -len("_RAW")]
         if WMCORE_EXE_EXMSG_RE.match(key):
             value = str(decode_and_decompress(value))
 
