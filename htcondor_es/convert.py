@@ -388,6 +388,12 @@ def to_json(ad, return_dict=False, reduce_data=False):
 
     result["ScheddName"] = ad.get("GlobalJobId", "UNKNOWN").split("#")[0]
 
+    # Enforce camel case names for GPU attrs
+    if "RequestGpus" in ad:
+        ad["RequestGpus"] = ad_pop(ad, "RequestGpus")
+    if "GpusProvisioned" in ad:
+        ad["GpusProvisioned"] = ad_pop(ad, "GpusProvisioned")
+
     bulk_convert_ad_data(ad, result)
 
     # Classify failed jobs
@@ -442,12 +448,9 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
 
     slot_gpus = []
-    if "RequestGpus" in ad:
-        ad["RequestGpus"] = ad_pop(ad, "RequestGpus") # enforce camel case
-        if not isinstance(ad.eval("RequestGpus"), classad.Value):
-            slot_gpus.append(int(ad.eval("RequestGpus")))
+    if "RequestGpus" in ad and if not isinstance(ad.eval("RequestGpus"), classad.Value):
+        slot_gpus.append(int(ad.eval("RequestGpus")))
     if "GpusProvisioned" in ad:
-        ad["GpusProvisioned"] = ad_pop(ad, "GpusProvisioned") # enforce camel case
         if (
                 not isinstance(ad.eval("GpusProvisioned"), classad.Value) and
                 not (len(slot_gpus) == 1 and slot_gpus[0] == 0)
