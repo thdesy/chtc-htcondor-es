@@ -448,14 +448,15 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["MemoryMB"] = ad.get("ResidentSetSize_RAW", 0) / 1024
 
     slot_gpus = []
-    if "RequestGpus" in ad and if not isinstance(ad.eval("RequestGpus"), classad.Value):
-        slot_gpus.append(int(ad.eval("RequestGpus")))
+    if "RequestGpus" in ad:
+        if not isinstance(ad.eval("RequestGpus"), classad.Value):
+            slot_gpus.append(int(ad.eval("RequestGpus")))
     if "GpusProvisioned" in ad:
         if (
                 not isinstance(ad.eval("GpusProvisioned"), classad.Value) and
                 not (len(slot_gpus) == 1 and slot_gpus[0] == 0)
             ):
-                slot_gpus.append(int(ad.eval("GpusProvisioned")))
+            slot_gpus.append(int(ad.eval("GpusProvisioned")))
     # only compute GPU stats if at least one GPU was requested
     if "RequestGpus" in ad and len(slot_gpus) > 0 and slot_gpus[0] != 0:
         slot_gpus = min(slot_gpus) # assume used GPUs is minimum of request or provided
