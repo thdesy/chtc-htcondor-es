@@ -466,7 +466,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
         result["CommittedGpuCoreHr"] = (
             slot_gpus * ad.get("CommittedTime", 0) / 3600
         )
-        result["GpuBadputHr"] = max(result["GpuCoreHr"] - result["CommitedGpuCoreHr"], 0)
+        result["GpuBadputHr"] = max(result["GpuCoreHr"] - result["CommittedGpuCoreHr"], 0)
 
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
