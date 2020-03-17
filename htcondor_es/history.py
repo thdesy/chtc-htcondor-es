@@ -76,7 +76,7 @@ def process_schedd(
         es = elastic.get_server_handle(args)
     try:
         if not args.dry_run:
-            history_iter = schedd.history(history_query, [], 10000)
+            history_iter = schedd.history(history_query, [], max(10000, args.process_max_documents))
         else:
             history_iter = []
 
