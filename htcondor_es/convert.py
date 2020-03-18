@@ -99,6 +99,9 @@ FLOAT_ATTRS = {
     "CpuTimeHr",
     "BadputHr",
     "CpuBadputHr",
+    "CpuGoodputHr",
+    "GpuBadputHr",
+    "GpuGoodputHr",
     "MemoryMB",
     "DiskUsageGB",
 }
@@ -467,6 +470,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
             slot_gpus * ad.get("CommittedTime", 0) / 3600
         )
         result["GpuBadputHr"] = max(result["GpuCoreHr"] - result["CommittedGpuCoreHr"], 0)
+        result["GpuGoodputHr"] = max(result["GpuCoreHr"] - result["GpuBadputHr"], 0)
 
     if "x509UserProxyFQAN" in ad:
         result["x509UserProxyFQAN"] = str(ad["x509UserProxyFQAN"]).split(",")
@@ -493,6 +497,7 @@ def to_json(ad, return_dict=False, reduce_data=False):
     ) / 3600
     result["BadputHr"] = max(result["CoreHr"] - result["CommittedCoreHr"], 0)
     result["CpuBadputHr"] = max(result["CoreHr"] - result["CpuTimeHr"], 0)
+    result["CpuGoodputHr"] = max(result["CoreHr"] - result["CpuBadputHr"], 0)
 
     # Parse new machine statistics.
     try:
