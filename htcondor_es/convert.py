@@ -104,6 +104,8 @@ FLOAT_ATTRS = {
     "GpuGoodputHr",
     "MemoryMB",
     "DiskUsageGB",
+    "DataRecvdMB",
+    "DataSentMB",
 }
 
 INT_ATTRS = {
@@ -411,6 +413,9 @@ def to_json(ad, return_dict=False, reduce_data=False):
         ad["CommittedTime"] = ad["RemoteWallClockTime"]
     result["WallClockHr"] = ad.get("RemoteWallClockTime", 0) / 3600
 
+    result["DataRecvdMB"] = ad.get("BytesRecvd", 0) / 1e6
+    result["DataSentMB"] = ad.get("BytesSent", 0) / 1e6
+    
     slot_cpus = []
     if "RequestCpus" not in ad:
         m = CREAM_RE.search(ad.get("CreamAttributes", ""))
