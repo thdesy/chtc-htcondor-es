@@ -401,9 +401,10 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["DataCollectionDate"] = result["RecordTime"]
 
     result["ScheddName"] = ad.get("GlobalJobId", "UNKNOWN").split("#")[0]
-    (result["StartdSlot"], result["StartdName"]) = ad.get("RemoteHost",
-                                                        ad.get("LastRemoteHost",
-                                                            "UNKNOWN@UNKNOWN")).split("@")
+    result["StartdSlot"] = ad.get("RemoteHost",
+                                ad.get("LastRemoteHost", "UNKNOWN@UNKNOWN")).split("@")[0]
+    result["StartdName"] = "@".join(ad.get("RemoteHost",
+                                ad.get("LastRemoteHost", "UNKNOWN@UNKNOWN")).split("@")[1:])
 
     # Enforce camel case names for GPU attrs
     if "RequestGpus" in ad:
