@@ -29,8 +29,10 @@ INDEXED_KEYWORD_ATTRS = {
     "GridJobId",
     "LastRemoteHost",
     "LastRemotePool",
-    "Owner",
     "RemoteHost",
+    "StartdSlot",
+    "StartdName",
+    "Owner",
     "User",
     "WMAgent_AgentName",
     "WMAgent_RequestName",
@@ -61,6 +63,8 @@ INDEXED_KEYWORD_ATTRS = {
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_JobId",
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_Queue",
     "MATCH_EXP_JOB_GLIDEIN_SiteWMS_Slot",
+    "JobState",
+    "JobBatchName",
 }
 
 NOINDEX_KEYWORD_ATTRS = {
@@ -85,6 +89,8 @@ NOINDEX_KEYWORD_ATTRS = {
     "SubmitEventNotes",
     "StartdIpAddr",
     "StartdPrincipal",
+    "StarterIpAddr",
+    "StarterPrincipal",
     "DAGManNodesLog",
     "DAGManNodesMask",
 }
@@ -106,9 +112,11 @@ FLOAT_ATTRS = {
     "DiskUsageGB",
     "DataRecvdMB",
     "DataSentMB",
+    "JobDuration",
 }
 
 INT_ATTRS = {
+    "AutoClusterId",
     "BytesRecvd",
     "BytesSent",
     "ClusterId",
@@ -261,7 +269,8 @@ IGNORE_ATTRS = {
     "PublicClaimId",
     "LastPublicClaimId",
     "orig_environment",
-    "osg_environment"
+    "osg_environment",
+    "ClaimId",
 }
 
 # Fields to be kept in docs concerning running jobs
@@ -392,6 +401,9 @@ def to_json(ad, return_dict=False, reduce_data=False):
     result["DataCollectionDate"] = result["RecordTime"]
 
     result["ScheddName"] = ad.get("GlobalJobId", "UNKNOWN").split("#")[0]
+    (result["StartdSlot"], result["StartdName"]) = ad.get("RemoteHost",
+                                                        ad.get("LastRemoteHost",
+                                                            "UNKNOWN@UNKNOWN")).split("@")
 
     # Enforce camel case names for GPU attrs
     if "RequestGpus" in ad:
