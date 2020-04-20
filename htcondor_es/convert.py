@@ -80,7 +80,6 @@ NOINDEX_KEYWORD_ATTRS = {
     "TransferInput",
     "TransferOutput",
     "TransferOutputRemaps",
-    "SpooledOutputFiles",
     "ExitReason",
     "LastHoldReason",
     "ReleaseReason",
@@ -271,6 +270,7 @@ IGNORE_ATTRS = {
     "orig_environment",
     "osg_environment",
     "ClaimId",
+    "SpooledOutputFiles",
 }
 
 # Fields to be kept in docs concerning running jobs
