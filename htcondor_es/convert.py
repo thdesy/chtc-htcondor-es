@@ -644,6 +644,8 @@ def bulk_convert_ad_data(ad, result):
                 value = None
         elif (key in TEXT_ATTRS) or (key in INDEXED_KEYWORD_ATTRS) or (key in NOINDEX_KEYWORD_ATTRS):
             value = str(value)
+            if len(value) > 256: # truncate strings longer than 256 characters
+                value = value[:253] + '...'
         elif key in FLOAT_ATTRS:
             try:
                 value = float(value)
