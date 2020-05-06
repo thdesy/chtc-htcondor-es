@@ -26,8 +26,9 @@ TIMEOUT_MINS = 11
 
 def default_config():
     defaults = {
-        'process_schedd_history'   : True,
+        'process_schedd_history'   : False,
         'process_schedd_queue'     : False,
+        'process_startd_history'   : False,
         'process_max_documents'    : 0,
         'process_parallel_queries' : 8,
         'es_host'                  : 'localhost',
@@ -35,6 +36,7 @@ def default_config():
         'es_bunch_size'            : 250,
         'es_feed_schedd_history'   : False,
         'es_feed_schedd_queue'     : False,
+        'es_feed_startd_history'   : False,
         'es_index_name'            : 'htcondor_jobs',
         'es_index_date_attr'       : 'CompletionDate',
     }
@@ -81,6 +83,9 @@ def load_config(args):
         if args.get('process_schedd_queue') is None:
             args['process_schedd_queue'] = process.getboolean(
                 'schedd_queue', fallback=defaults['process_schedd_queue'])
+        if args.get('process_startd_history') is None:
+            args['process_startd_history'] = process.getboolean(
+                'startd_history', fallback=defaults['process_startd_history'])
         if args.get('process_max_documents') is None:
             args['process_max_documents'] = process.getint(
                 'max_documents', fallback=defaults['process_max_documents'])
@@ -153,6 +158,46 @@ def get_schedds(args=None):
         return [s for s in schedd_ads if s["Name"] in args.schedds.split(",")]
 
     return schedd_ads
+
+
+def get_startds(args=None):
+    """
+    Return a list of startd ads representing all the startds in the pool.
+    """
+    collectors = args.collectors
+    if collectors:
+        collectors = collectors.split(',')
+    else:
+        collectors = []
+
+    startd_ads = {}
+    for host in collectors:
+        coll = htcondor.Collector(host)
+        try:
+            # get one ad per machine
+            startd_ads = coll.query(htcondor.AdTypes.Startd,
+                                          constraint = '(SlotType == "Static") || (SlotType == "Partitionable")',
+                                          projection = ["Name"])
+            for ad in startd_ads:
+                try:
+                    if ad["Name"][0:6] == "slot1@":
+                        startd = coll.locate(htcondor.DaemonTypes.Startd, ad["Name"])
+                        startd["MyPool"] = host
+                        startd_ads[startd["Machine"]] = startd
+                except Exception:
+                    continue
+
+        except IOError as e:
+            logging.warning(str(e))
+            continue
+
+    startd_ads = list(startd_ads.values())
+    random.shuffle(startd_ads)
+
+    if args and args.startds:
+        return [s for s in startd_ads if s["Machine"] in args.startds.split(",")]
+
+    return startd_ads
 
 
 def send_email_alert(recipients, subject, message):
