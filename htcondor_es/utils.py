@@ -115,6 +115,9 @@ def load_config(args):
         if args.get('es_feed_schedd_queue') is None:
             args['es_feed_schedd_queue'] = es.getboolean(
                 'feed_schedd_queue', fallback=defaults['es_feed_schedd_queue'])
+        if args.get('es_feed_startd_history') is None:
+            if args['es_feed_startd_history'] = es.getboolean(
+                'feed_startd_history', fallback=defaults['es_feed_startd_history'])
         if args.get('es_index_name') is None:
             args['es_index_name'] = es.get(
                 'index_name', fallback=defaults['es_index_name'])
