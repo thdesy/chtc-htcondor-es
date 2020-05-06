@@ -197,11 +197,11 @@ def process_startd(
     Given a startd, process its entire set of history since last checkpoint.
     """
     last_completion = since["EnteredCurrentStatus"]
-    since_str = f"""(GlobalJobId == "{since['GlobalJobId']}") && (EnteredCurrentStatus <= "{since['EnteredCurrentStatus']}")"""
+    since_str = f"""(GlobalJobId == "{since['GlobalJobId']}") && (EnteredCurrentStatus == {since['EnteredCurrentStatus']})"""
     my_start = time.time()
     if utils.time_remaining(start_time) < 0:
         message = (
-            "No time remaining to process %s history; exiting." % startd_ad["Name"]
+            "No time remaining to process %s history; exiting." % startd_ad["Machine"]
         )
         logging.error(message)
         utils.send_email_alert(
@@ -277,7 +277,7 @@ def process_startd(
                 }
 
             if utils.time_remaining(start_time) < 0:
-                message = f"History crawler on {startd_ad['Name']} has been running for more than {utils.TIMEOUT_MINS:d} minutes; exiting."
+                message = f"History crawler on {startd_ad['Machine']} has been running for more than {utils.TIMEOUT_MINS:d} minutes; exiting."
                 logging.error(message)
                 utils.send_email_alert(
                     args.email_alerts, "spider history timeout warning", message
@@ -380,8 +380,8 @@ def process_histories(schedd_ads = [], startd_ads = [],
             name = schedd_ad["Name"]
 
             # Check for last completion time
-            # If there was no previous completion, get last 12 h
-            last_completion = checkpoint.get(name, time.time() - 12 * 3600)
+            # If there was no previous completion, get full history
+            last_completion = checkpoint.get(name, 0)
 
             future = pool.apply_async(
                 process_schedd,
@@ -391,16 +391,16 @@ def process_histories(schedd_ads = [], startd_ads = [],
 
     if len(startd_ads) > 0:
         for startd_ad in startd_ads:
-            name = startd_ad["Name"]
+            machine = startd_ad["Machine"]
 
             # Check for last completion time ("since")
-            since = checkpoint.get(name, {"GlobalJobId": "Unknown", "EnteredCurrentStatus": 0})
+            since = checkpoint.get(machine, {"GlobalJobId": "Unknown", "EnteredCurrentStatus": 0})
 
             future = pool.apply_async(
                 process_startd,
                 (starttime, since, checkpoint_queue, startd_ad, args, metadata),
             )
-            futures.append((name, future))
+            futures.append((machine, future))
             
 
     def _chkp_updater():
@@ -428,7 +428,7 @@ def process_histories(schedd_ads = [], startd_ads = [],
                 future.get(utils.time_remaining(starttime) + 10)
             except multiprocessing.TimeoutError:
                 # This implies that the checkpoint hasn't been updated
-                message = "Schedd %s history timed out; ignoring progress." % name
+                message = "Daemon %s history timed out; ignoring progress." % name
                 exc = traceback.format_exc()
                 message += f"\n{exc}"
                 logging.error(message)
