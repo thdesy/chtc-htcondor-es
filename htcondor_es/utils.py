@@ -175,10 +175,10 @@ def get_startds(args=None):
         coll = htcondor.Collector(host)
         try:
             # get one ad per machine
-            startd_ads = coll.query(htcondor.AdTypes.Startd,
-                                          constraint = '(SlotType == "Static") || (SlotType == "Partitionable")',
-                                          projection = ["Name"])
-            for ad in startd_ads:
+            name_ads = coll.query(htcondor.AdTypes.Startd,
+                                      constraint = '(SlotType == "Static") || (SlotType == "Partitionable")',
+                                      projection = ["Name"])
+            for ad in name_ads:
                 try:
                     if ad["Name"][0:6] == "slot1@":
                         startd = coll.locate(htcondor.DaemonTypes.Startd, ad["Name"])
