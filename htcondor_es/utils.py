@@ -182,10 +182,18 @@ def get_startds(args=None):
             # get one ad per machine
             name_ads = coll.query(htcondor.AdTypes.Startd,
                                       constraint = '(SlotType == "Static") || (SlotType == "Partitionable")',
-                                      projection = ["Name"])
+                                      projection = ["Name", "CondorVersion"])
             for ad in name_ads:
                 try:
+                    version = [int(x) for x in ad["CondorVersion"].split()[1].split('.')]
                     if ad["Name"][0:6] == "slot1@":
+                        if not (
+                            (version[0] == 8 and version[1] == 9 and version[2] >= 7) or
+                            (version[0] == 8 and version[1] > 9) or
+                            (version[0] > 8)
+                        ):
+                            logger.warning(f"The Startd on {ad['Name'].split('@')[-1]} is running HTCondor < 8.9.7 and will be skipped")
+                            continue
                         startd = coll.locate(htcondor.DaemonTypes.Startd, ad["Name"])
                         startd["MyPool"] = host
                         startd_ads[startd["Machine"]] = startd
