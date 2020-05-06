@@ -75,6 +75,8 @@ def load_config(args):
         args['collectors'] = ','.join(list(config['COLLECTORS']))
     if (args.get('schedds') is None)    and ('SCHEDDS' in config)    and (len(list(config['SCHEDDS'])) > 0):
         args['schedds']    = ','.join(list(config['SCHEDDS']))
+    if (args.get('startds') is None)    and ('STARTDS' in config)    and (len(list(config['STARTDS'])) > 0):
+        args['startds']    = ','.join(list(config['STARTDS']))
     if 'PROCESS' in config:
         process = config['PROCESS']
         if args.get('process_schedd_history') is None:
