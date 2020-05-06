@@ -357,7 +357,7 @@ def update_checkpoint(name, completion_date):
     checkpoint[name] = completion_date
 
     with open("checkpoint.json", "w") as fd:
-        json.dump(checkpoint, fd)
+        json.dump(checkpoint, fd, indent=4)
 
 
 def process_histories(schedd_ads = [], startd_ads = [],
