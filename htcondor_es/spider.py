@@ -21,9 +21,16 @@ def main_driver(args):
     signal.alarm(utils.TIMEOUT_MINS * 60 + 60)
 
     # Get all the schedd ads
-    schedd_ads = []
-    schedd_ads = utils.get_schedds(args)
-    logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
+    if args.process_schedd_history or args.process_schedd_queue:
+        schedd_ads = []
+        schedd_ads = utils.get_schedds(args)
+        logging.warning("&&& There are %d schedds to query.", len(schedd_ads))
+
+    # Get all the startd ads
+    if args.process_startd_history:
+        startd_ads = []
+        startd_ads = utils.get_startds(args)
+        logging.warning("&&& There are %d startds to query.", len(startd_ads))
 
     with multiprocessing.Pool(processes=args.process_parallel_queries) as pool:
         metadata = utils.collect_metadata()
@@ -41,6 +48,15 @@ def main_driver(args):
         if args.process_schedd_queue:
             queues.process_queues(
                 schedd_ads=schedd_ads,
+                starttime=starttime,
+                pool=pool,
+                args=args,
+                metadata=metadata,
+            )
+
+        if args.process_startd_history:
+            history.process_histories(
+                startd_ads=startd_ads,
                 starttime=starttime,
                 pool=pool,
                 args=args,
@@ -73,7 +89,7 @@ def main():
     parser.add_argument(
         "--collectors",
         dest="collectors",
-        help="Comma-separated list of Collector addresses used to locate Schedds",
+        help="Comma-separated list of Collector addresses used to locate Schedds/Startds",
     )
     parser.add_argument(
         "--schedds",
@@ -84,11 +100,19 @@ def main():
         ),
     )
     parser.add_argument(
-        "--skip_process_schedd_history",
+        "--startds",
+        dest="startds",
+        help=(
+            "Comma-separated list of Startd machines to process "
+            "[default is to process all Startds located by Collectors]"
+        ),
+    )
+    parser.add_argument(
+        "--process_schedd_history",
         action="store_const",
         const=False,
         dest="process_schedd_history",
-        help="Do not process Schedd history"
+        help="Process Schedd history"
     )
     parser.add_argument(
         "--process_schedd_queue",
@@ -96,6 +120,13 @@ def main():
         const=True,
         dest="process_schedd_queue",
         help="Process Schedd queue (Running/Idle/Pending jobs)",
+    )
+    parser.add_argument(
+        "--process_startd_history",
+        action="store_const",
+        const=True,
+        dest="process_startd_history",
+        help="Process Startd history"
     )
     parser.add_argument(
         "--process_max_documents",
@@ -159,6 +190,16 @@ def main():
         help=(
             "Feed Schedd queue to Elasticsearch "
             f"[default: {defaults['es_feed_schedd_queue']}]"
+        )
+    )
+    parser.add_argument(
+        "--es_feed_startd_history",
+        action="store_const",
+        const=True,
+        dest="es_feed_startd_history",
+        help=(
+            "Feed Startd history to Elasticsearch "
+            f"[default: {defaults['es_feed_startd_history']}]"
         )
     )
     parser.add_argument(

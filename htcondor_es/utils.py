@@ -26,8 +26,9 @@ TIMEOUT_MINS = 11
 
 def default_config():
     defaults = {
-        'process_schedd_history'   : True,
+        'process_schedd_history'   : False,
         'process_schedd_queue'     : False,
+        'process_startd_history'   : False,
         'process_max_documents'    : 0,
         'process_parallel_queries' : 8,
         'es_host'                  : 'localhost',
@@ -35,6 +36,7 @@ def default_config():
         'es_bunch_size'            : 250,
         'es_feed_schedd_history'   : False,
         'es_feed_schedd_queue'     : False,
+        'es_feed_startd_history'   : False,
         'es_index_name'            : 'htcondor_jobs',
         'es_index_date_attr'       : 'CompletionDate',
     }
@@ -73,6 +75,8 @@ def load_config(args):
         args['collectors'] = ','.join(list(config['COLLECTORS']))
     if (args.get('schedds') is None)    and ('SCHEDDS' in config)    and (len(list(config['SCHEDDS'])) > 0):
         args['schedds']    = ','.join(list(config['SCHEDDS']))
+    if (args.get('startds') is None)    and ('STARTDS' in config)    and (len(list(config['STARTDS'])) > 0):
+        args['startds']    = ','.join(list(config['STARTDS']))
     if 'PROCESS' in config:
         process = config['PROCESS']
         if args.get('process_schedd_history') is None:
@@ -81,6 +85,9 @@ def load_config(args):
         if args.get('process_schedd_queue') is None:
             args['process_schedd_queue'] = process.getboolean(
                 'schedd_queue', fallback=defaults['process_schedd_queue'])
+        if args.get('process_startd_history') is None:
+            args['process_startd_history'] = process.getboolean(
+                'startd_history', fallback=defaults['process_startd_history'])
         if args.get('process_max_documents') is None:
             args['process_max_documents'] = process.getint(
                 'max_documents', fallback=defaults['process_max_documents'])
@@ -108,6 +115,9 @@ def load_config(args):
         if args.get('es_feed_schedd_queue') is None:
             args['es_feed_schedd_queue'] = es.getboolean(
                 'feed_schedd_queue', fallback=defaults['es_feed_schedd_queue'])
+        if args.get('es_feed_startd_history') is None:
+            args['es_feed_startd_history'] = es.getboolean(
+                'feed_startd_history', fallback=defaults['es_feed_startd_history'])
         if args.get('es_index_name') is None:
             args['es_index_name'] = es.get(
                 'index_name', fallback=defaults['es_index_name'])
@@ -153,6 +163,54 @@ def get_schedds(args=None):
         return [s for s in schedd_ads if s["Name"] in args.schedds.split(",")]
 
     return schedd_ads
+
+
+def get_startds(args=None):
+    """
+    Return a list of startd ads representing all the startds in the pool.
+    """
+    collectors = args.collectors
+    if collectors:
+        collectors = collectors.split(',')
+    else:
+        collectors = []
+
+    startd_ads = {}
+    for host in collectors:
+        coll = htcondor.Collector(host)
+        try:
+            # get one ad per machine
+            name_ads = coll.query(htcondor.AdTypes.Startd,
+                                      constraint = '(SlotType == "Static") || (SlotType == "Partitionable")',
+                                      projection = ["Name", "CondorVersion"])
+            for ad in name_ads:
+                try:
+                    version = [int(x) for x in ad["CondorVersion"].split()[1].split('.')]
+                    if ad["Name"][0:6] == "slot1@":
+                        if not (
+                            (version[0] == 8 and version[1] == 9 and version[2] >= 7) or
+                            (version[0] == 8 and version[1] > 9) or
+                            (version[0] > 8)
+                        ):
+                            logger.warning(f"The Startd on {ad['Name'].split('@')[-1]} is running HTCondor < 8.9.7 and will be skipped")
+                            continue
+                        startd = coll.locate(htcondor.DaemonTypes.Startd, ad["Name"])
+                        startd["MyPool"] = host
+                        startd_ads[startd["Machine"]] = startd
+                except Exception:
+                    continue
+
+        except IOError as e:
+            logging.warning(str(e))
+            continue
+
+    startd_ads = list(startd_ads.values())
+    random.shuffle(startd_ads)
+
+    if args and args.startds:
+        return [s for s in startd_ads if s["Machine"] in args.startds.split(",")]
+
+    return startd_ads
 
 
 def send_email_alert(recipients, subject, message):
