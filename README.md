@@ -1,3 +1,8 @@
+History
+------------------------
+
+* forked from https://github.com/jasoncpatton/chtc-htcondor-es
+
 
 ElasticSearch upload for HTCondor data
 ----------------------------------------------
